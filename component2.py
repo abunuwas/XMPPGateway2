@@ -15,6 +15,7 @@ import time
 from optparse import OptionParser
 
 import sleekxmpp
+from sleekxmpp import roster
 from sleekxmpp.componentxmpp import ComponentXMPP
 from sleekxmpp.stanza.roster import Roster
 from sleekxmpp.xmlstream import ElementBase
@@ -86,7 +87,11 @@ class ConfigComponent(ComponentXMPP):
                                      config['port'])
 
         # Store the roster information.
-        self.roster = config['roster']['items']
+        self.roster = roster.Roster(self)
+        self.roster.add(self.boundjid)
+        print('First roster: ', self.roster)
+        #self.roster = config['roster']['item']
+        #print('Roster: ', self.roster)
 
         # The session_start event will be triggered when
         # the component establishes its connection with the
@@ -103,12 +108,17 @@ class ConfigComponent(ComponentXMPP):
         # stanza is received. Be aware that that includes
         # MUC messages and error messages.
         self.add_event_handler("message", self.message)
+        print(self.boundjid.bare)
+        self.add_event_handler('iq', self.iq)
 
         #self.auto_authorize = True
         #self.auto_subscribe = True
 
     def presence(self, presence):
         print(presence)
+        self.sendPresence(pto=presence['from'], pfrom=self.boundjid.bare)
+        #if not presence['type'] == 'unavailable' and presence['from'] != 'test.use-xmpp-01':
+        #    self.sendPresence(pto=presence['from'])
 
     def start(self, event):
         """
@@ -133,9 +143,14 @@ class ConfigComponent(ComponentXMPP):
             if self.roster[jid]['subscription'] != 'none':
                 self.sendPresence(pfrom=self.jid, pto=jid)
         '''
-        self.sendPresence(pfrom='userx@muc.localhost', pto='user1@localhost/test')
+        #self.send_presence(pto='use-xmpp-01', pfrom='test.use-xmpp-01')
+        #self.sendPresence(pto='test.use-xmpp-01', ptype='available')
+        self.sendPresence(pfrom=self.boundjid.bare, pto='use-xmpp-01')
+        self.sendPresenceSubscription(pfrom=self.boundjid.bare, pto='use-xmpp-01')
         self.sendPresenceSubscription(pto='user1@localhost', ptype='subscribe', pfrom='userx@muc.localhost')
         #self._start_thread('chat_send', self.chat_send)
+        print(event)
+        #self.sendPresence(pfrom='user1@localhost')
 
     def subscribe(self, presence):
         # If the subscription request is rejected.
@@ -145,6 +160,7 @@ class ConfigComponent(ComponentXMPP):
         #    return
          
         # If the subscription request is accepted.
+        print(presence)
         self.sendPresence(pto=presence['from'],
                           ptype='subscribed')
 
@@ -162,7 +178,8 @@ class ConfigComponent(ComponentXMPP):
         #self.backend.roster.subscribed(presence['from'])
 
         # Send a new presence update to the subscriber.
-        self.sendPresence(pto=presence['from'])        
+        print(presence)
+        self.sendPresenceSubscription(pto=presence['from'])        
         
 
     def message(self, msg):
@@ -185,6 +202,10 @@ class ConfigComponent(ComponentXMPP):
         
         print(msg)
         msg.reply("Thanks for sending\n%(body)s" % msg).send()
+
+    def iq(self, content):
+        print(content)
+        content.reply('Thanks for sending iq').send()
 
 
     def chat_send(self):
