@@ -1,0 +1,5 @@
+venv-old/
+venv/
+__pycache__/
+dnspython/
+config*
