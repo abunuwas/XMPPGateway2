@@ -20,7 +20,24 @@ from sleekxmpp.componentxmpp import ComponentXMPP
 from sleekxmpp.stanza.roster import Roster
 from sleekxmpp.xmlstream import ElementBase
 from sleekxmpp.xmlstream.stanzabase import ET, registerStanzaPlugin
+from sleekxmpp.jid import JID
+from sleekxmpp.stanza.iq import Iq
 
+import paho.mqtt.client as paho
+
+def on_connect(client, userdata, flags, rc):
+    print('CONNACK received with code %d.' % (rc))
+
+def on_publish(client, userdata, mid):
+    print("mid: "+str(mid))
+'''
+client = paho.Client()
+client.will_set(topic='factory/devices/cameras', payload=None, qos=0, retain=False)
+client.on_connect = on_connect
+client.on_publish = on_publish
+client.connect('127.0.0.1', port=5533, keepalive=60)
+client.loop_forever()
+'''
 # Python versions before 3.0 do not use UTF-8 encoding
 # by default. To ensure that Unicode is handled properly
 # throughout SleekXMPP, we will set the default encoding
@@ -61,7 +78,17 @@ class Config(ElementBase):
     sub_interfaces = interfaces
 
 
+class IntamacHandler(ElementBase):
+
+    namespace = 'intamac:intamacdeviceinfo'
+    name = 'intamacdeviceinfo'
+    plugin_attrib = 'iq_intamacdeviceinfo'
+    #interfaces = set(('name', 'value')) # not needed I think in principle
+    #sub_interfaces = interfaces
+
+
 registerStanzaPlugin(Config, Roster)
+registerStanzaPlugin(Iq, IntamacHandler)
 
 
 class ConfigComponent(ComponentXMPP):
@@ -85,11 +112,16 @@ class ConfigComponent(ComponentXMPP):
                                      config['secret'],
                                      config['server'],
                                      config['port'])
-
+        '''
+        self.registerHandler(
+            Callback('Intamac Device Info',
+                MatchXPath('{%s}iq/{%s}task' % (self.default_ns, IntamacHandler.namespace)),
+                self.handl_task))
+        '''
         # Store the roster information.
-        self.roster = roster.Roster(self)
-        self.roster.add(self.boundjid)
-        print('First roster: ', self.roster)
+        #self.roster = roster.Roster(self)
+        #self.roster.add(self.boundjid)
+        #print('First roster: ', self.roster)
         #self.roster = config['roster']['item']
         #print('Roster: ', self.roster)
 
@@ -99,10 +131,11 @@ class ConfigComponent(ComponentXMPP):
         # want to listen for this event so that we we can
         # broadcast any needed initial presence stanzas.
         self.add_event_handler("session_start", self.start)
-        self.add_event_handler('presence_subscribe', self.subscribe)
-        self.add_event_handler('presence_subscribed', self.subscribed)
+        #self.add_event_handler('presence_subscribe', self.subscribe)
+        #self.add_event_handler('presence_subscribed', self.subscribed)
         self.add_event_handler('presence', self.presence)
-        self.add_event_handler('stream', self.stream)
+        #self.add_event_handler('stream', self.stream)
+        self.add_event_handler('presence_probe', self.probe)
 
 
         # The message event is triggered whenever a message
@@ -110,12 +143,19 @@ class ConfigComponent(ComponentXMPP):
         # MUC messages and error messages.
         self.add_event_handler("message", self.message)
         self.add_event_handler('iq', self.iq)
+        self.add_event_handler('iq_intamacdeviceinfo', self.intamac_device_info)
+        #self.add_event_handler('roster_subscription_request', self.roster_subscription_request)
 
         #self.auto_authorize = True
         #self.auto_subscribe = True
 
     def presence(self, presence):
         print(presence)
+        print('TYPE: ', presence['type'])
+        _from = JID(presence['from']).bare
+        print(_from)
+        if _from != 'muc@' + self.boundjid.bare and _from != self.boundjid.bare and _from != 'muc@' + self.boundjid.bare + '/muc' and presence['type'] == 'available':
+            self.send_presence(pto=_from, pfrom='muc@' + self.boundjid.bare + '/muc')
         #if _from != 'userx@' + self.boundjid.bare:
         #        self.sendPresence(pto=presence['from'], pfrom=self.boundjid.bare)
 
@@ -142,11 +182,13 @@ class ConfigComponent(ComponentXMPP):
             if self.roster[jid]['subscription'] != 'none':
                 self.sendPresence(pfrom=self.jid, pto=jid)
         '''
-        self.sendPresence(self.boundjid.bare)
-        self.sendPresenceSubscription(pto='user1@localhost', pfrom=self.boundjid.bare)
-        #self._start_thread('chat_send', self.chat_send)
-        #print(event)
-        #self.sendPresence(pfrom='user1@localhost')
+        # Using the method send_presence() without arguments should just work. The problem
+        # is that ejabberd then takes the presence from the component (muc.localhost) and 
+        # sends it to itself (muc.localhost), resulting in an error. The error seems to 
+        # arise from the fact that a presence is being sent from a JID to the same JID.
+        # The solution that I can think of for the moment is to explicitly define 
+        # a specific destination and a different sender JID. 
+        self.send_presence(pfrom='muc@test.use-xmpp-01', pto='test.use-xmpp-01')
 
     def subscribe(self, presence):
         # If the subscription request is rejected.
@@ -157,8 +199,8 @@ class ConfigComponent(ComponentXMPP):
          
         # If the subscription request is accepted.
         print('Subscribe: ', presence)
-        self.sendPresence(pto=presence['from'],
-                          ptype='subscribe', pfrom=self.boundjid.bare)
+        self.send_presence(pto=presence['from'],
+                          ptype='subscribe', pfrom='muc@' + self.boundjid.bare)
 
         # Save the fact that a subscription has been accepted, somehow. Here
         # we use a backend object that has a roster.
@@ -175,7 +217,7 @@ class ConfigComponent(ComponentXMPP):
 
         # Send a new presence update to the subscriber.
         print('Subscribed: ', presence)
-        self.sendPresence(pto=presence['from'], ptype='subscribed')        
+        self.sendPresence(pto=presence['from'], ptype='subscribed', pfrom='muc@' + self.boundjid.bare)        
         
 
     def message(self, msg):
@@ -196,19 +238,23 @@ class ConfigComponent(ComponentXMPP):
         # The reply method will use the messages 'to' JID as the
         # outgoing reply's 'from' JID.
         print(msg)
+        #(rc, mid) = cilent.publish("factory/devices/cameras", msg, qos=1)
         msg.reply("Thanks for sending\n%(body)s" % msg).send()
+
+    def probe(self, probe):
+        print(probe)
 
     def iq(self, content):
         print(content)
 
+    def intamac_device_info(self, info):
+        print(info)
+        id = info['id']
+        ito = info['from']
+        self.make_iq_result(id=id, ito=ito, ifrom='muc@' + self.boundjid.bare).send()
 
-    def chat_send(self):
-        while True:
-            self.send_message('user2@localhost', 'THIS IS A MESSAGE', 'chat', 'muc.localhost')
-            time.sleep(5)
-
-    def stream(self, stream):
-        print(stream)
+    def roster_subscription_request(self, request):
+        print(request)
 
 
 if __name__ == '__main__':
@@ -232,7 +278,7 @@ if __name__ == '__main__':
 
     # Connect to the XMPP server and start processing XMPP stanzas.
     if xmpp.connect():
-        xmpp.process(threaded=False)
+        xmpp.process(threaded=True)
         print("Done")
     else:
         print("Unable to connect.")
