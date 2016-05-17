@@ -97,8 +97,9 @@ class IntamacHandler(ElementBase):
 
 
 registerStanzaPlugin(Config, Roster)
-registerStanzaPlugin(Iq, IntamacHandler)
+#registerStanzaPlugin(Iq, IntamacHandler)
 
+threaded = False
 
 class ConfigComponent(ComponentXMPP):
 
@@ -121,12 +122,12 @@ class ConfigComponent(ComponentXMPP):
                                      config['secret'],
                                      config['server'],
                                      config['port'])
-        
+        '''
         self.registerHandler(
             Callback('Intamac Device Info',
                 MatchXPath('{%s}iq/{%s}task' % (self.default_ns, IntamacHandler.namespace)),
                 self.intamac_device_info))
-        
+        '''
         # Store the roster information.
         #self.roster = roster.Roster(self)
         #self.roster.add(self.boundjid)
@@ -139,25 +140,25 @@ class ConfigComponent(ComponentXMPP):
         # server and the XML streams are ready for use. We
         # want to listen for this event so that we we can
         # broadcast any needed initial presence stanzas.
-        self.add_event_handler("session_start", self.start, threaded=False)
-        self.add_event_handler('presence', self.presence, threaded=False)
-        self.add_event_handler('iq_intamacdeviceinfo', self.intamac_device_info, threaded=False)
+        self.add_event_handler("session_start", self.start, threaded=threaded)
+        self.add_event_handler('presence', self.presence, threaded=threaded)
+        #self.add_event_handler('iq_intamacdeviceinfo', self.intamac_device_info, threaded=False)
         if option == 'unsubscribe':
             print('on unsubscribe mode')
             pass
         else: 
             print('adding other handlers')
-            self.add_event_handler('presence_subscribe', self.subscribe, threaded=False)
-            self.add_event_handler('presence_subscribed', self.subscribed, threaded=False)    
+            self.add_event_handler('presence_subscribe', self.subscribe, threaded=threaded)
+            self.add_event_handler('presence_subscribed', self.subscribed, threaded=threaded)    
             #self.add_event_handler('stream', self.stream)
-            self.add_event_handler('presence_probe', self.probe, threaded=False)
+            self.add_event_handler('presence_probe', self.probe, threaded=threaded)
 
 
         # The message event is triggered whenever a message
         # stanza is received. Be aware that that includes
         # MUC messages and error messages.
-        self.add_event_handler("message", self.message, threaded=False)
-        self.add_event_handler('iq', self.iq, threaded=False)
+        self.add_event_handler("message", self.message, threaded=threaded)
+        self.add_event_handler('iq', self.iq, threaded=True)
         print(self.boundjid)
         #self.add_event_handler('roster_subscription_request', self.roster_subscription_request, threaded=True)
 
@@ -172,12 +173,12 @@ class ConfigComponent(ComponentXMPP):
         _from = JID(presence['from']).bare
         print(_from)
         if _from != 'muc@' + self.boundjid.bare and _from != self.boundjid.bare and _from != 'muc@' + self.boundjid.bare + '/muc' and presence['type'] == 'available':
-            self.send_presence(pto=_from, pfrom='muc@' + self.boundjid.bare + '/muc')
+            self.send_presence(pto=_from, pfrom='muc@' + self.boundjid.bare)
             if option == 'unsubscribe':
-                self.send_presence(pto=_from, pfrom='muc@' + self.boundjid.bare + '/muc', ptype='unsubscribe')
-                self.send_presence(pto=_from, pfrom='muc@' + self.boundjid.bare + '/muc', ptype='unsubscribed')
-                self.send_presence(pto=_from, pfrom='muc@' + self.boundjid.bare, ptype='unsubscribe')
-                self.send_presence(pto=_from, pfrom='muc@' + self.boundjid.bare, ptype='unsubscribed')
+                self.send_presence(pto=_from, pfrom='muc@' + self.boundjid.bare , ptype='unsubscribe')
+                self.send_presence(pto=_from, pfrom='muc@' + self.boundjid.bare , ptype='unsubscribed')
+                #self.send_presence(pto=_from, pfrom='muc@' + self.boundjid.bare, ptype='unsubscribe')
+                #self.send_presence(pto=_from, pfrom='muc@' + self.boundjid.bare, ptype='unsubscribed')
         #if _from != 'userx@' + self.boundjid.bare:
         #        self.sendPresence(pto=presence['from'], pfrom=self.boundjid.bare)
 
@@ -212,6 +213,7 @@ class ConfigComponent(ComponentXMPP):
         # a specific destination and a different sender JID. 
         self.send_presence(pfrom='muc@' + self.boundjid.bare, pto=self.boundjid.bare)
         self.send_presence(pfrom='muc@' + self.boundjid.bare, pto=self.boundjid.bare)
+        #self.send_presence(pfrom='muc@' + self.boundjid.bare, pto='user2@use-xmpp-01/test')
 
     def subscribe(self, presence):
         # If the subscription request is rejected.
@@ -226,8 +228,8 @@ class ConfigComponent(ComponentXMPP):
         print(len(subscriptions))
         print(presence)
         print('This should be subscribe: ', presence['type'])
-        self.send_presence(pto=presence['from'],
-                          ptype='subscribe', pfrom='muc@' + self.boundjid.bare + '/muc')
+        self.send_presence_subscription(pto=presence['from'],
+                          pfrom='muc@' + self.boundjid.bare)
 
         # Save the fact that a subscription has been accepted, somehow. Here
         # we use a backend object that has a roster.
@@ -246,7 +248,7 @@ class ConfigComponent(ComponentXMPP):
         print('Subscribed: ', presence)
         print(presence)
         print('This should be subscribed: ', presence['type'])
-        self.sendPresence(pto=presence['from'], ptype='subscribed', pfrom='muc@' + self.boundjid.bare)        
+        self.send_resence_subscribed(pto=presence['from'], pfrom='muc@' + self.boundjid.bare)        
         
 
     def message(self, msg):
@@ -271,7 +273,7 @@ class ConfigComponent(ComponentXMPP):
         msg.reply("Thanks for sending\n%(body)s" % msg).send()
 
     def probe(self, probe):
-        print('This should be probe: ', presence['type'])
+        print('This should be probe: ', probe['type'])
         print(probe)
 
     def iq(self, content):
@@ -314,11 +316,16 @@ if __name__ == '__main__':
     if xmpp.connect():
         print(option)
         xmpp.process(block=False)
+        '''
         while True:
             print(len(subscriptions))
             print(len(presences))
             time.sleep(10)
-
+        '''
         print("Done")
     else:
         print("Unable to connect.")
+
+
+
+
