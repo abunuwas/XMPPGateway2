@@ -7,6 +7,7 @@ import time
 from sleekxmpp.stanza.iq import Iq
 from sleekxmpp.xmlstream.stanzabase import ET, registerStanzaPlugin
 from sleekxmpp.xmlstream import ElementBase, StanzaBase
+from sleekxmpp.exceptions import IqTimeout, IqError
 
 
 import sleekxmpp
@@ -14,19 +15,26 @@ import sleekxmpp
 
 strings = '&lt;xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;&gt;&lt;DeviceInfo version=&quot;1.0&quot;&gt;&lt;deviceName&gt;IP CAMERA&lt;/deviceName&gt;&lt;deviceID&gt;88&lt;/deviceID&gt;&lt;deviceDescription&gt;IPCamera&lt;/deviceDescription&gt;&lt;deviceLocation&gt;STD-CGI&lt;/deviceLocation&gt;&lt;systemContact&gt;STD-CGI&lt;/systemContact&gt;&lt;model&gt;SWO-SVC01K&lt;/model&gt;&lt;serialNumber&gt;SWO-SVC01K0120150427CCRR516288616&lt;/serialNumber&gt;&lt;macAddress&gt;bc:51:fe:83:27:7d&lt;/macAddress&gt;&lt;firmwareVersion&gt;V5.0.5&lt;/firmwareVersion&gt;&lt;firmwareReleasedDate&gt;151020&lt;/firmwareReleasedDate&gt;&lt;bootVersion&gt;V1.3.4&lt;/bootVersion&gt;&lt;bootReleasedDate&gt;100316&lt;'
 
-class IntamacHandler(StanzaBase):
+class IntamacHandler(ElementBase):
 
 	namespace = 'intamac:intamacdeviceinfo'
 	name = 'intamacdeviceinfo'
 	plugin_attrib = 'iq_intamacdeviceinfo'
 	
-	def __init__(self):
-		StanzaBase.__init__(self, parent=None)
+	def __init__(self, param):
+		ET.register_namespace('', 'intamac:intamacdeviceinfo')
+		root = ET.Element('{intamac:intamacdeviceinfo}intamacdeviceinfo')
+		root.text = param
+		ElementBase.__init__(self, xml=root)
 
+'''
 	def add_param(self, param):
-		param = ET.Element(param)
-		StanzaBase.set_payload(self, param)
-
+		ET.register_namespace('', 'intamac:intamacdeviceinfo')
+		root = ET.Element('{intamac:intamacdeviceinfo}intamacdeviceinfo')
+		root.text = param
+		return ET.ElementTree(root)
+		#StanzaBase.set_payload(self, param)
+'''
 
 
 #registerStanzaPlugin(Iq, IntamacHandler)
@@ -48,7 +56,7 @@ class EchoBot(sleekxmpp.ClientXMPP):
 		#self.add_event_handler('presence', self.presence)
 
 	def start(self, event):
-		self.send_presence()
+		self.send_presence(pto='muc@test.use-xmpp-01')
 		#self.send_presence(pfrom=self.boundjid.bare, pto='muc@test.use-xmpp-01', ptype='subscribe')
 		#self.send_presence(pfrom=self.boundjid.bare, pto='muc@muc.localhost', ptype='subscribe')
 		roster = self.get_roster()
@@ -65,7 +73,7 @@ class EchoBot(sleekxmpp.ClientXMPP):
 	def subscribe(self, presence):
 		print(presence)
 		print(presence['type'])
-		self.send_presence_subscribe(pto=presence['from'], pfrom=self.boundjid.bare)
+		self.send_presence_subscription(pto=presence['from'], pfrom=self.boundjid.bare)
 
 	def subscribed(self, presence):
 		print(presence)
@@ -80,35 +88,71 @@ class EchoBot(sleekxmpp.ClientXMPP):
 	def chat_send(self):
 		while True:
 			self.send_message(mfrom=self.boundjid.bare, mbody='THIS IS A MESSAGE', 
-				mtype='chat', mto='use-xmpp-01')
+				mtype='chat', mto='test.use-xmpp-01')
 			time.sleep(20)
 
+	def make_send_iq(self):
+		device_info = IntamacHandler(strings)
+		iq = self.make_iq_set(sub=device_info, ito='user1@use-xmpp-01/test', ifrom=self.boundjid.bare)
+		#print('printing IQ')
+		#print('IQ: ', iq)
+		resp = iq.send(timeout=5)
+		return resp
+
 	def iq_send(self):
-		device_info = IntamacHandler()
+		#device_info = IntamacHandler(strings)
 		#device_info['intamacdeviceinfo'] = strings
-		device_info.add_param(strings)
-		iq = self.make_iq_set(sub=device_info, ito='muc@test.use-xmpp-01/muc', ifrom=self.boundjid.bare)
+		#device_info.add_param(strings)
+		#ET.register_namespace('', 'intamac:intamacdeviceinfo')
+		#root = ET.Element('{intamac:intamacdeviceinfo}intamacdeviceinfo')
+		#root.text = strings
+		#tree = ET.ElementTree(root)
+		#iq = self.make_iq_set(sub=device_info, ito='muc@test.use-xmpp-01/muc', ifrom=self.boundjid.bare)
 		#iq['intamacdeviceinfo'] = IntamacHandler()
 		#iq['intamacdeviceinfo'].text = strings
 		#iq['intamacdeviceinfo'].namespace = 'intamac:intamacdeviceinfo'
 		while True:
-			print('printing IQ')
-			print('IQ: ', iq)
+			try:
+				resp = self.make_send_iq()
+				print(resp)
+			except IqError as e:
+				print(str(e))
+			except IqTimeout as e:
+				print(str(e))
 			time.sleep(5)
 
-if __name__ == '__main__':
-	logging.basicConfig(level=logging.DEBUG, format='%(levelname)-8s %(message)s')
-	xmpp = EchoBot('user2@use-xmpp-01/test', 'mypassword')
+
+def make_bot(username):
+	xmpp = EchoBot(username + '@use-xmpp-01/test', 'mypassword')
 	xmpp.registerPlugin('xep_0030') # Service Discovery
 	xmpp.registerPlugin('xep_0004') # Data Forms
 	xmpp.registerPlugin('xep_0060') # PubSub
 	xmpp.registerPlugin('xep_0199') # XMPP Ping
-	#xmpp.ssl_version = ssl.PROTOCOL_SSLv3
-	if xmpp.connect(('52.71.183.201', 5222), use_tls=True, use_ssl=False):
+	if xmpp.connect(('52.71.184.144', 5222), use_tls=True, use_ssl=False):
 		print('connecting...')
 		xmpp.process(block=True)
 		print('Done')
 	else:
 		print('Unable to connect')
+
+
+if __name__ == '__main__':
+	logging.basicConfig(level=logging.DEBUG, format='%(levelname)-8s %(message)s')
+
+	import multiprocessing as mp
+	from multiprocessing import Process, Pipe, Array, Manager, Pool
+
+	jobs = []
+	for i in range(2):
+		process = mp.Process(target=make_bot, args=('user' + str(i),))
+		jobs.append(process)
+
+	for job in jobs:
+		job.start()
+
+	#for job in jobs:
+	#	job.join()
+
+
 
 

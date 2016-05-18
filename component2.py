@@ -19,11 +19,12 @@ from sleekxmpp import roster
 from sleekxmpp.componentxmpp import ComponentXMPP
 from sleekxmpp.stanza.roster import Roster
 from sleekxmpp.xmlstream import ElementBase
-from sleekxmpp.xmlstream.stanzabase import ET, registerStanzaPlugin
+from sleekxmpp.xmlstream.stanzabase import ET, registerStanzaPlugin, register_stanza_plugin
 from sleekxmpp.jid import JID
 from sleekxmpp.stanza.iq import Iq
 from sleekxmpp.xmlstream.handler.callback import Callback
 from sleekxmpp.xmlstream.matcher.xpath import MatchXPath
+from sleekxmpp.xmlstream.matcher import StanzaPath
 
 import paho.mqtt.client as paho
 
@@ -92,12 +93,16 @@ class IntamacHandler(ElementBase):
     namespace = 'intamac:intamacdeviceinfo'
     name = 'intamacdeviceinfo'
     plugin_attrib = 'iq_intamacdeviceinfo'
-    #interfaces = set(('name', 'value')) # not needed I think in principle
-    #sub_interfaces = interfaces
+    
+    def __init__(self, param=None, *args, **kwargs):
+        ET.register_namespace('', 'intamac:intamacdeviceinfo')
+        root = ET.Element('{intamac:intamacdeviceinfo}intamacdeviceinfo')
+        root.text = param
+        ElementBase.__init__(self, xml=root)
 
 
-registerStanzaPlugin(Config, Roster)
-#registerStanzaPlugin(Iq, IntamacHandler)
+register_stanza_plugin(Config, Roster)
+register_stanza_plugin(Iq, IntamacHandler)
 
 threaded = False
 
@@ -122,12 +127,16 @@ class ConfigComponent(ComponentXMPP):
                                      config['secret'],
                                      config['server'],
                                      config['port'])
-        '''
-        self.registerHandler(
-            Callback('Intamac Device Info',
-                MatchXPath('{%s}iq/{%s}task' % (self.default_ns, IntamacHandler.namespace)),
+
+        path = '{%s}%s' % (IntamacHandler.namespace, IntamacHandler.name)
+        print('THE PATH IS THIS: ', path)
+        
+        self.register_handler(
+            Callback('iq_intamacdeviceinfo',
+                StanzaPath('iq@type=set/iq_intamacdeviceinfo'),
                 self.intamac_device_info))
-        '''
+
+        
         # Store the roster information.
         #self.roster = roster.Roster(self)
         #self.roster.add(self.boundjid)
@@ -140,9 +149,9 @@ class ConfigComponent(ComponentXMPP):
         # server and the XML streams are ready for use. We
         # want to listen for this event so that we we can
         # broadcast any needed initial presence stanzas.
-        self.add_event_handler("session_start", self.start, threaded=threaded)
+        self.add_event_handler("session_start", self.start, threaded=True)
         self.add_event_handler('presence', self.presence, threaded=threaded)
-        #self.add_event_handler('iq_intamacdeviceinfo', self.intamac_device_info, threaded=False)
+        self.add_event_handler('iq_intamacdeviceinfo', self.intamac_device_info, threaded=True)
         if option == 'unsubscribe':
             print('on unsubscribe mode')
             pass
@@ -212,7 +221,7 @@ class ConfigComponent(ComponentXMPP):
         # The solution that I can think of for the moment is to explicitly define 
         # a specific destination and a different sender JID. 
         self.send_presence(pfrom='muc@' + self.boundjid.bare, pto=self.boundjid.bare)
-        self.send_presence(pfrom='muc@' + self.boundjid.bare, pto=self.boundjid.bare)
+        #self.send_presence(pfrom='muc@' + self.boundjid.bare, pto=self.boundjid.bare)
         #self.send_presence(pfrom='muc@' + self.boundjid.bare, pto='user2@use-xmpp-01/test')
 
     def subscribe(self, presence):
@@ -248,7 +257,7 @@ class ConfigComponent(ComponentXMPP):
         print('Subscribed: ', presence)
         print(presence)
         print('This should be subscribed: ', presence['type'])
-        self.send_resence_subscribed(pto=presence['from'], pfrom='muc@' + self.boundjid.bare)        
+        self.send_presence(pto=presence['from'], pfrom='muc@' + self.boundjid.bare, ptype='subscribed')        
         
 
     def message(self, msg):
@@ -278,6 +287,7 @@ class ConfigComponent(ComponentXMPP):
 
     def iq(self, content):
         print(content)
+        self.make_iq_result(ito=content['from'], id=['id'], ifrom='muc@' + self.boundjid.bare).send()
 
     def intamac_device_info(self, info):
         print(info)
@@ -309,6 +319,8 @@ if __name__ == '__main__':
     xmpp.registerPlugin('xep_0004') # Data Forms
     xmpp.registerPlugin('xep_0060') # PubSub
     xmpp.registerPlugin('xep_0199') # XMPP Ping
+    #mpp.registerPlugin('xep-0198')
+    #mpp.registerPlugin('xep-0313')
 
     
 
