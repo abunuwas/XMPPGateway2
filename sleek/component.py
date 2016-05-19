@@ -26,85 +26,13 @@ from sleekxmpp.xmlstream.handler.callback import Callback
 from sleekxmpp.xmlstream.matcher.xpath import MatchXPath
 from sleekxmpp.xmlstream.matcher import StanzaPath
 
-import paho.mqtt.client as paho
-
-def on_connect(client, userdata, flags, rc):
-    print('CONNACK received with code %d.' % (rc))
-
-def on_publish(client, userdata, mid):
-    print("mid: "+str(mid))
-'''
-client = paho.Client()
-client.will_set(topic='factory/devices/cameras', payload=None, qos=0, retain=False)
-client.on_connect = on_connect
-client.on_publish = on_publish
-client.connect('127.0.0.1', port=5533, keepalive=60)
-client.loop_forever()
-'''
-# Python versions before 3.0 do not use UTF-8 encoding
-# by default. To ensure that Unicode is handled properly
-# throughout SleekXMPP, we will set the default encoding
-# ourselves to UTF-8.
-if sys.version_info < (3, 0):
-    reload(sys)
-    sys.setdefaultencoding('utf8')
-
-
-subscriptions = []
-presences = []
-
-
-option = None
-
-
-class Config(ElementBase):
-
-    """
-    In order to make loading and manipulating an XML config
-    file easier, we will create a custom stanza object for
-    our config XML file contents. See the documentation
-    on stanza objects for more information on how to create
-    and use stanza objects and stanza plugins.
-
-    We will reuse the IQ roster query stanza to store roster
-    information since it already exists.
-
-    Example config XML:
-      <config xmlns="sleekxmpp:config">
-        <jid>component.localhost</jid>
-        <secret>ssshh</secret>
-        <server>localhost</server>
-        <port>8888</port>
-
-        <query xmlns="jabber:iq:roster">
-          <item jid="user@example.com" subscription="both" />
-        </query>
-      </config>
-    """
-
-    name = "config"
-    namespace = "sleekxmpp:config"
-    interfaces = set(('jid', 'secret', 'server', 'port'))
-    sub_interfaces = interfaces
-
-
-class IntamacHandler(ElementBase):
-
-    namespace = 'intamac:intamacdeviceinfo'
-    name = 'intamacdeviceinfo'
-    plugin_attrib = 'iq_intamacdeviceinfo'
-    
-    def __init__(self, param=None, *args, **kwargs):
-        ET.register_namespace('', 'intamac:intamacdeviceinfo')
-        root = ET.Element('{intamac:intamacdeviceinfo}intamacdeviceinfo')
-        root.text = param
-        ElementBase.__init__(self, xml=root)
+from custom_stanzas import IntamacHandler, Config
 
 
 register_stanza_plugin(Config, Roster)
 register_stanza_plugin(Iq, IntamacHandler)
 
-threaded = False
+
 
 class ConfigComponent(ComponentXMPP):
 

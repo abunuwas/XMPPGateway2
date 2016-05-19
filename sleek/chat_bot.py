@@ -9,32 +9,11 @@ from sleekxmpp.xmlstream.stanzabase import ET, registerStanzaPlugin
 from sleekxmpp.xmlstream import ElementBase, StanzaBase
 from sleekxmpp.exceptions import IqTimeout, IqError
 
-
-import sleekxmpp
+from custom_stanzas import IntamacHandler
 
 
 strings = '&lt;xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;&gt;&lt;DeviceInfo version=&quot;1.0&quot;&gt;&lt;deviceName&gt;IP CAMERA&lt;/deviceName&gt;&lt;deviceID&gt;88&lt;/deviceID&gt;&lt;deviceDescription&gt;IPCamera&lt;/deviceDescription&gt;&lt;deviceLocation&gt;STD-CGI&lt;/deviceLocation&gt;&lt;systemContact&gt;STD-CGI&lt;/systemContact&gt;&lt;model&gt;SWO-SVC01K&lt;/model&gt;&lt;serialNumber&gt;SWO-SVC01K0120150427CCRR516288616&lt;/serialNumber&gt;&lt;macAddress&gt;bc:51:fe:83:27:7d&lt;/macAddress&gt;&lt;firmwareVersion&gt;V5.0.5&lt;/firmwareVersion&gt;&lt;firmwareReleasedDate&gt;151020&lt;/firmwareReleasedDate&gt;&lt;bootVersion&gt;V1.3.4&lt;/bootVersion&gt;&lt;bootReleasedDate&gt;100316&lt;'
 
-class IntamacHandler(ElementBase):
-
-	namespace = 'intamac:intamacdeviceinfo'
-	name = 'intamacdeviceinfo'
-	plugin_attrib = 'iq_intamacdeviceinfo'
-	
-	def __init__(self, param):
-		ET.register_namespace('', 'intamac:intamacdeviceinfo')
-		root = ET.Element('{intamac:intamacdeviceinfo}intamacdeviceinfo')
-		root.text = param
-		ElementBase.__init__(self, xml=root)
-
-'''
-	def add_param(self, param):
-		ET.register_namespace('', 'intamac:intamacdeviceinfo')
-		root = ET.Element('{intamac:intamacdeviceinfo}intamacdeviceinfo')
-		root.text = param
-		return ET.ElementTree(root)
-		#StanzaBase.set_payload(self, param)
-'''
 
 
 #registerStanzaPlugin(Iq, IntamacHandler)
@@ -89,7 +68,7 @@ class EchoBot(sleekxmpp.ClientXMPP):
 		while True:
 			self.send_message(mfrom=self.boundjid.bare, mbody='THIS IS A MESSAGE', 
 				mtype='chat', mto='test.use-xmpp-01')
-			time.sleep(20)
+			time.sleep(5)
 
 	def make_send_iq(self):
 		device_info = IntamacHandler(strings)
