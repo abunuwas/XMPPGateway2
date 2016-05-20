@@ -17,7 +17,7 @@ import threading
 
 import curses
 
-from custom_stanzas import DeviceInfo, IntamacStream
+from custom_stanzas import DeviceInfo, IntamacStream, IntamacFirmwareUpgrade, IntamacAPI, IntamacEvent
 
 
 strings = '&lt;xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;&gt;&lt;DeviceInfo version=&quot;1.0&quot;&gt;&lt;deviceName&gt;IP CAMERA&lt;/deviceName&gt;&lt;deviceID&gt;88&lt;/deviceID&gt;&lt;deviceDescription&gt;IPCamera&lt;/deviceDescription&gt;&lt;deviceLocation&gt;STD-CGI&lt;/deviceLocation&gt;&lt;systemContact&gt;STD-CGI&lt;/systemContact&gt;&lt;model&gt;SWO-SVC01K&lt;/model&gt;&lt;serialNumber&gt;SWO-SVC01K0120150427CCRR516288616&lt;/serialNumber&gt;&lt;macAddress&gt;bc:51:fe:83:27:7d&lt;/macAddress&gt;&lt;firmwareVersion&gt;V5.0.5&lt;/firmwareVersion&gt;&lt;firmwareReleasedDate&gt;151020&lt;/firmwareReleasedDate&gt;&lt;bootVersion&gt;V1.3.4&lt;/bootVersion&gt;&lt;bootReleasedDate&gt;100316&lt;'
@@ -88,10 +88,10 @@ class EchoBot(sleekxmpp.ClientXMPP):
             type='start', 
             timeout='10', 
             quality='sub')
-        print(stream)
-        #iqs = [self.make_iq_set(sub=device_info, ito=conn, ifrom=self.boundjid.bare) for conn in connections]
-        #resp = [iq.send(timeout=5) for iq in iqs]
-        #return resp       
+        #print(stream)
+        iqs = [self.make_iq_set(sub=stream, ito=conn, ifrom=self.boundjid.bare) for conn in connections]
+        resp = [iq.send(timeout=5) for iq in iqs]
+        return resp       
 
     def iqs_send(self):
         while True:
@@ -126,6 +126,34 @@ class EchoBot(sleekxmpp.ClientXMPP):
         for conn in connections:
             self.send_presence(pto=conn, ptype='unsubscribe')
 
+    def intamac_firmware_upgrade(self):
+        upgrade = IntamacFirmwareUpgrade()
+        upgrade['location'] = "https://stg.upgrade.swann.intamac.com/swa_firmware_v505_151020.dav"
+        #print(upgrade)
+        iqs = [self.make_iq_set(sub=upgrade, ito=conn, ifrom=self.boundjid.bare) for conn in connections]
+        resp = [iq.send(timeout=5) for iq in iqs]
+        return resp 
+
+    def intamac_api(self):
+        api = IntamacAPI(enabled='True', tag='SmokeAlarm', sensitivity='50')
+        #api['SoundPackList']['SoundPack']['enabled'] = 'True'
+        #print(api)
+        iqs = [self.make_iq_set(sub=api, ito=conn, ifrom=self.boundjid.bare) for conn in connections]
+        resp = [iq.send(timeout=5) for iq in iqs]
+        return resp 
+
+    def intamac_ping(self):
+        ping = self['xep_0199'].ping(pto=connections[0])
+        #print(ping)
+
+    def intamac_event(self):
+        event = IntamacEvent(event='2016-01-07T12:11:38', type='VMD', sequence='72', description='MotionAlarm')
+        #print(event)
+        iqs = [self.make_iq_set(sub=event, ito=conn, ifrom=self.boundjid.bare) for conn in connections]
+        resp = [iq.send(timeout=5) for iq in iqs]
+        return resp 
+
+
 def make_bot(username):
     xmpp = EchoBot(username + '@use-xmpp-01/test', 'mypassword')
     xmpp.registerPlugin('xep_0030') # Service Discovery
@@ -153,10 +181,22 @@ def presses(xmpp):
             xmpp.send_unsubscriptions()
         if key == 'chat':
             xmpp.chat_send()
+        if key == 'message':
+            xmpp.bot_message()
         if key == 'disconnect':
             xmpp.disconnect()
         if key == 'stream':
             xmpp.intamac_stream()
+        if key == 'upgrade':
+            xmpp.intamac_firmware_upgrade()
+        if key == 'api':
+            xmpp.intamac_api()
+        if key == 'ping':
+            xmpp.intamac_ping()
+        if key == 'event':
+            xmpp.intamac_event()
+        if key == 'info':
+            xmpp.device_info()
 
 
 if __name__ == '__main__':

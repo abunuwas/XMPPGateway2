@@ -26,18 +26,23 @@ from sleekxmpp.xmlstream.handler.callback import Callback
 from sleekxmpp.xmlstream.matcher.xpath import MatchXPath
 from sleekxmpp.xmlstream.matcher import StanzaPath
 
-from custom_stanzas import DeviceInfo, Config, IntamacStream
+from custom_stanzas import DeviceInfo, IntamacStream, IntamacFirmwareUpgrade, IntamacAPI, IntamacEvent, Config 
 
 import atexit 
 
 
 register_stanza_plugin(Config, Roster)
-register_stanza_plugin(Iq, DeviceInfo)
-register_stanza_plugin(Iq, IntamacStream)
+
+#custom_stanzas = { DeviceInfo, IntamacStream, IntamacFirmwareUpgrade, IntamacAPI, IntamacEvent }
+
+#for custom_stanza in custom_stanzas:
+#    register_stanza_plugin(Iq, custom_stanza)
+
 
 threaded = True
 
 messages = []
+
 
 class ConfigComponent(ComponentXMPP):
 
@@ -60,20 +65,33 @@ class ConfigComponent(ComponentXMPP):
                                      config['secret'],
                                      config['server'],
                                      config['port'], use_jc_ns=False)
-        
+
+        custom_stanzas = {
+            DeviceInfo: self.intamac_device_info,
+            IntamacStream: self.intamac_stream,
+            IntamacFirmwareUpgrade: self.intamac_firmware_upgrade,
+            IntamacAPI: self.intamac_api,
+            IntamacEvent: self.intamac_event
+        }
+
+        for custom_stanza, handler in custom_stanzas.items():
+            register_stanza_plugin(Iq, custom_stanza)
+            self.register_handler(
+                Callback(custom_stanza.plugin_attrib,
+                    StanzaPath('iq@type=set/{}'.format(custom_stanza.plugin_attrib)),
+                    handler)
+                )
+
+        '''
         self.register_handler(
-            Callback('iq_intamacdeviceinfo',
-                StanzaPath('iq@type=set/iq_intamacdeviceinfo'),
+            Callback('iq_api',
+                StanzaPath('iq@type=set/iq_intamacapi'),
                 self.intamac_device_info))
-
-        self.register_handler(
-            Callback('iq_intamacstream',
-                StanzaPath('iq@type=set/iq_intamacstream'),
-                self.intamac_stream))
-
+        
+        '''
         #self.add_event_handler("session_start", self.start, threaded=True)
         #self.add_event_handler('presence', self.presence, threaded=threaded)
-        self.add_event_handler('iq_intamacdeviceinfo', self.intamac_device_info, threaded=True)
+        #self.add_event_handler('iq_intamacdeviceinfo', self.intamac_device_info, threaded=True)
         self.add_event_handler('presence_subscribe', self.subscribe, threaded=threaded)
         self.add_event_handler('presence_subscribed', self.subscribed, threaded=threaded)    
         #self.add_event_handler('presence_probe', self.probe, threaded=threaded)
@@ -88,6 +106,10 @@ class ConfigComponent(ComponentXMPP):
         #if xml.tag.startswith('{jabber:client}'):
         #    xml.tag = xml.tag.replace('jabber:client', self.default_ns)
         #return xml
+
+    @classmethod
+    def variables(cls):
+        return cls.__dict__
 
     def presence(self, presence):
         print(presence)
@@ -133,21 +155,44 @@ class ConfigComponent(ComponentXMPP):
         print('This should be probe: ', probe['type'])
         print(probe)
 
-    def iq(self, content):
+    def iq(content):
         print(content)
         print('ORIGIN IS: ', content['from'])
-        self.make_iq_result(ito=content['from'], id=['id'], ifrom=self.boundjid.bare  + '/test').send()
+        #self.make_iq_result(ito=content['from'], id=['id'], ifrom=self.boundjid.bare  + '/test').send()
+        content.reply().send()
 
     def intamac_device_info(self, info):
         print(info)
         origin = JID(info['from']).bare
-        self.make_iq_result(id=info['id'], ito=info['from'], ifrom=self.boundjid.bare + '/test').send()
+        #self.make_iq_result(id=info['id'], ito=info['from'], ifrom=self.boundjid.bare + '/test').send()
+        info.reply().send()
 
-    def intamac_stream(self, info):
-        print(info)
+    def intamac_stream(self, stream):
+        print(stream)
+        origin = JID(stream['from']).bare
+        #self.make_iq_result(id=stream['id'], ito=stream['from'], ifrom=self.boundjid.bare + '/test').send()
+        stream.reply().send()
 
+    def intamac_firmware_upgrade(self, upgrade):
+        print(upgrade)
+        origin = JID(upgrade['from']).bare
+        #self.make_iq_result(id=upgrade['id'], ito=upgrade['from'], ifrom=self.boundjid.bare + '/test').send()
+        upgrade.reply().send()
+
+    def intamac_api(self, api):
+        print(api)
+        origin = JID(api['from']).bare
+        #self.make_iq_result(id=api['id'], ito=api['from'], ifrom=self.boundjid.bare + '/test').send()
+        api.reply().send()
+
+    def intamac_event(self, event):
+        print(event)
+        origin = JID(event['from']).bare
+        #self.make_iq_result(id=event['id'], ito=event['from'], ifrom=self.boundjid.bare + '/test').send()
+        event.reply().send()
 
 if __name__ == '__main__':
+
     def exit_handler():
         xmpp.disconnect()
 
@@ -162,7 +207,7 @@ if __name__ == '__main__':
     config = Config(xml=ET.fromstring(config_data))
     config_file.close()
 
-    xmpp = ConfigComponent(config)
+    xmpp = ConfigComponent(config)   
     xmpp.registerPlugin('xep_0030') # Service Discovery
     xmpp.registerPlugin('xep_0004') # Data Forms
     xmpp.registerPlugin('xep_0060') # PubSub
@@ -171,7 +216,6 @@ if __name__ == '__main__':
     # Connect to the XMPP server and start processing XMPP stanzas.
     if xmpp.connect():
         xmpp.process(block=False)
-
         print("Done")
     else:
         print("Unable to connect.")
