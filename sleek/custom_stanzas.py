@@ -75,24 +75,29 @@ class IntamacAPI(ElementBase):
 	namespace = 'intamac:intamacapi'
 	interfaces = set(('url', 'type', 'SoundPackList'))
 	plugin_attrib = 'iq_intamacapi'
-	sub_interfaces = interfaces
+	sub_interfaces = set(('SoundPackList',))
 	default_handler = 'intamac_api'
 
-	def __init__(self, tag=None, enabled=None, sensitivity=None, *args, **kwargs):
+	def __init__(self, soundpacklist=False, tag=None, enabled=None, sensitivity=None, type=None, url=None, param='', *args, **kwargs):
 		# Do we want to make checks on the values passed as parameters for each of
 		# these tags? For example, do we want to ensure that enabled is only True
 		# or False, or that tag is only one of Aggression, BabyCry, CarAlarm, etc.? 
 		ET.register_namespace('', 'intamac:intamacapi')
 		root = ET.Element('{intamac:intamacapi}intamacapi')
-		sound_pack_list = ET.SubElement(root, 'SoundPackList')
-		sound_pack = ET.SubElement(sound_pack_list, 'SoundPack')
-		tag_tag = ET.SubElement(sound_pack, 'tag')
-		tag_tag.text = tag
-		tag_enabled = ET.SubElement(sound_pack, 'enabled')
-		tag_enabled.text = enabled
-		tag_sensitivity = ET.SubElement(sound_pack, 'sensitivity')
-		tag_sensitivity.text = sensitivity
+		root.text = param
+		if soundpacklist == True:
+			sound_pack_list = ET.SubElement(root, 'SoundPackList')
+			sound_pack = ET.SubElement(sound_pack_list, 'SoundPack')
+			tag_tag = ET.SubElement(sound_pack, 'tag')
+			tag_tag.text = tag
+			tag_enabled = ET.SubElement(sound_pack, 'enabled')
+			tag_enabled.text = enabled
+			tag_sensitivity = ET.SubElement(sound_pack, 'sensitivity')
+			tag_sensitivity.text = sensitivity
 		ElementBase.__init__(self, xml=root)
+		self['type'] = type
+		self['url'] = url
+
 
 
 class IntamacEvent(ElementBase):
@@ -143,3 +148,5 @@ class Config(ElementBase):
 	interfaces = set(('jid', 'secret', 'server', 'port'))
 	sub_interfaces = interfaces
 	default_handler = ''
+
+	
