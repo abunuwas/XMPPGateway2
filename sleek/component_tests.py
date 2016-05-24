@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from sleek.queueing import stream
+#from sleek.queueing import stream
 
 import sys
 import logging

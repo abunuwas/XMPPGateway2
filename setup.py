@@ -7,5 +7,5 @@ setup(name='XMPPGateway',
 		url='',
 		license='',
 		packages=['sleek', 'sleek.queueing'],
-		py_modules=['sleek.custom_stanzas', 'sleek.queueing.stream']
+		py_modules=['sleek.custom_stanzas']
 		)
