@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from queueing import stream
+from sleek.queueing import stream
 
 import sys
 import logging
@@ -23,7 +23,7 @@ from sleekxmpp.xmlstream.handler.callback import Callback
 from sleekxmpp.xmlstream.matcher.xpath import MatchXPath
 from sleekxmpp.xmlstream.matcher import StanzaPath
 
-from custom_stanzas import DeviceInfo, IntamacStream, IntamacFirmwareUpgrade, IntamacAPI, IntamacEvent, Config 
+from sleek.custom_stanzas import DeviceInfo, IntamacStream, IntamacFirmwareUpgrade, IntamacAPI, IntamacEvent, Config 
 
 import atexit 
 
