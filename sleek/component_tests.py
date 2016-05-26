@@ -1,7 +1,68 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+#
+# Copyright 2016 Intamac Systems Ltd. All Rights Reserved. 
+# 
+# Licensed under the Apache License, Version 2.0 (the "License").
+# You may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-#from sleek.queueing import stream
+"""
+:module: sleek.custom_stanzas.
+:author: Jose Haro (jharoperalta@intamac.com).
+:synopsis: Custom stanza implementations. 
+:platforms: Linux and Unix.
+:python-version: Python 3. 
+
+This module defines a class to implement the Component kind
+of connection to the XMPP server. 
+
+.. WARNING:: In its current state, the module defines only a basic
+             implementation of the component. Further additions are 
+             needed in the following direction:
+             - Ensures that the component actually deals correctly
+               with all sort of stanzas coming to it.
+             - Include `try`-`except` clauses to catch all sort of
+               possible exceptions that might be raised in different
+               situations.
+             - Enable logging functionality.
+             - Enable proper management capabilities for the flow of
+               communication with the DVRs. 
+             - Separate the testing functionality into a test-oriented
+               implementation of the component. 
+             - Ensure that the available plugins from the SleekXMPP
+               library are used and leveraged to the highest extent
+               possible. 
+             - Ensure also that the currently registered plugins are
+               used properly and to the highest extent possible. 
+             - Include functionality to manage the component roster.
+             - Ensure that the path chosen to deal with custom stanzas
+               (both plugin registartion and custom class implementation
+               of the method listeners to process received stanzas) is
+               the most adequate to facilitate the highest possible 
+               separation of concerns in the further development of 
+               this codebase. For example, if state is not needed to
+               deal with the stanzas, their custom processing methods 
+               could be implemented in the code of the actual stanzas,
+               thereby keeping the component code short, clean, and 
+               isolated from issues that might not be its concern here. 
+             - Ensure that by all means presence stanzas are handled in
+               the most efficient and expected way. 
+             - Include parameters to allow the initialization of the 
+               component in threaded mode or not. 
+
+Classes
+-------
+.. ConfigComponent
+"""
 
 import sys
 import logging
@@ -23,24 +84,29 @@ from sleekxmpp.xmlstream.handler.callback import Callback
 from sleekxmpp.xmlstream.matcher.xpath import MatchXPath
 from sleekxmpp.xmlstream.matcher import StanzaPath
 
-from sleek.custom_stanzas import DeviceInfo, IntamacStream, IntamacFirmwareUpgrade, IntamacAPI, IntamacEvent, Config 
+from sleek.custom_stanzas import (DeviceInfo, 
+                                IntamacStream, 
+                                IntamacFirmwareUpgrade, 
+                                IntamacAPI, 
+                                IntamacEvent, 
+                                Config
+                                )
 
 import atexit 
 
 
 register_stanza_plugin(Config, Roster)
 
-#custom_stanzas = { DeviceInfo, IntamacStream, IntamacFirmwareUpgrade, IntamacAPI, IntamacEvent }
-
-#for custom_stanza in custom_stanzas:
-#    register_stanza_plugin(Iq, custom_stanza)
-
+# The three lines of code below serve testing purposes. They should
+# not be present in production code. 
 
 threaded = True
 
 messages = []
 
-connections = ['c42f90b752dd@use-xmpp-01/camera', 'c42f90b752dd@use-xmpp-01', 'user0@use-xmpp-01']
+connections = ['c42f90b752dd@use-xmpp-01/camera', 
+                'c42f90b752dd@use-xmpp-01', 
+                'user0@use-xmpp-01']
 
 
 class ConfigComponent(ComponentXMPP):
@@ -96,6 +162,8 @@ class ConfigComponent(ComponentXMPP):
                 self.delay)
             )
 
+        # The following piece of code shows how a normal registration
+        # process for a single stanza plugin takes place: 
         '''
         self.register_handler(
             Callback('iq_api',
@@ -103,6 +171,13 @@ class ConfigComponent(ComponentXMPP):
                 self.intamac_device_info))
         
         '''
+
+        # The following lines of code take care of registering 
+        # specific listener methods for every kind of stanza that
+        # we want to process. The code will be cleaned once a final
+        # decision regarding the best way to deal with this is 
+        # rechaed. 
+
         self.add_event_handler("session_start", self.start, threaded=True)
         #self.add_event_handler('presence', self.presence, threaded=threaded)
         #self.add_event_handler('iq_intamacdeviceinfo', self.intamac_device_info, threaded=True)
@@ -113,15 +188,8 @@ class ConfigComponent(ComponentXMPP):
         #self.add_event_handler("message", self.message, threaded=threaded)
         #self.add_event_handler('iq', self.iq, threaded=True)
 
-        print('THIS IS THE DEFAULT NS: ', self.default_ns)
-
-    #def incoming_filter(self, xml):
-        #print(ET.dump(xml))
-        #return xml
-        #if xml.tag.startswith('{jabber:client}'):
-        #    xml.tag = xml.tag.replace('jabber:client', self.default_ns)
-        #return xml
-
+    # The usefulness of this class method is not yet clear, but might prove useful
+    # later on. 
     @classmethod
     def variables(cls):
         return cls.__dict__

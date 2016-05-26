@@ -1,5 +1,72 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+#
+# Copyright 2016 Intamac Systems Ltd. All Rights Reserved. 
+# 
+# Licensed under the Apache License, Version 2.0 (the "License").
+# You may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+:module: sleek.custom_stanzas.
+:author: Jose Haro (jharoperalta@intamac.com).
+:synopsis: Custom stanza implementations. 
+:platforms: Linux and Unix.
+:python-version: Python 3. 
+
+This module implements classes that define custom stanza
+namespaces which are needed to process correctly the flow 
+of communication with the XMPP clients. 
+
+.. WARNING:: The classes below don't follow strictly the expected 
+			 protocol when building the stanzas. Instead of just 
+			 relying on the class attributes to achieve that, an 
+		     initialization method is defined in most of the cases to 
+		     build the XML of the stanza manually. That does not 
+		     leverage the functionality inherited from ElementBase.
+		     An effort should be made later on to make the classes 
+		     comply with that interface. 
+		     Additional checks might be included for:
+		     - Ensuring that all stanzas are built with the right
+		       parameters.
+		     - `try`-`except` clauses should be included to catch 
+		       all sort of potential errors and avoid breaking the
+		       execution of the program. 
+		     - Include checks to ensure that, in those cases where
+		       certain parameters can only take on a specific set 
+		       of values, users do not assign to them unexpected 
+		       values. For example, the parameter `quality` in 
+		       the `IntamacStream` stanza can only take on the 
+		       values `sub` or `main`, and some checks should be
+		       included to ensure that only one of those is 
+		       assigned. 
+		     - Logging functionality should be enabled. 
+
+Stanza Classes
+--------------
+.. DeviceInfo
+   :namespace: 'intamac:intamacdeviceinfo'
+.. IntamacStream
+   :namespace: 'intamac:intamacstream'
+.. IntamacFirmwareUpgrade
+   :namespace: 'intamac:intamacfirmwareupgrade'
+.. IntamacSetting
+   :namespace: 'intamac:intamacsetting'
+.. IntamacAPI
+   :namespace: 'intamac:intamacapi'
+.. IntamacEvent
+   :namespace: 'intamac:intamacevent'
+.. Config
+   :namespace: 'sleekxmpp:config'
+"""
 
 from sleekxmpp.xmlstream.stanzabase import ET
 from sleekxmpp.xmlstream import ElementBase
@@ -12,19 +79,21 @@ class DeviceInfo(ElementBase):
 	default_handler = 'intamac_device_info'
 	
 	def __init__(self, param=None, *args, **kwargs):
+		'''
+		Class constructor that builds the manually
+		the XML of the stanza. This procedure is needed
+		at the moment to be able to include text into
+		the stanza root elements, as the default 
+		functionality does not seem to allow that. 
+		After defining the XML body of the stanza, 
+		ElementBase is initiated passing the body of the
+		stanza as an argument for the `xml` parameter
+		of the ElementBase class. 
+		'''
 		ET.register_namespace('', 'intamac:intamacdeviceinfo')
 		root = ET.Element('{intamac:intamacdeviceinfo}intamacdeviceinfo')
 		root.text = param
 		ElementBase.__init__(self, xml=root)
-
-'''
-	def add_param(self, param):
-		ET.register_namespace('', 'intamac:intamacdeviceinfo')
-		root = ET.Element('{intamac:intamacdeviceinfo}intamacdeviceinfo')
-		root.text = param
-		return ET.ElementTree(root)
-		#StanzaBase.set_payload(self, param)
-'''
 
 
 class IntamacStream(ElementBase):
@@ -32,14 +101,20 @@ class IntamacStream(ElementBase):
 	name = 'intamacstream'
 	plugin_attrib = 'iq_intamacstream'
 	interfaces = set(('ip', 'port', 'type', 'timeout', 'quality'))
-	# The two lines below are meant to limit the values that the 
-	# elements in the interfaces can take on. However, as of now
-	# this functionality is not enabled. 
-	types = set(('start', 'stop'))
-	quality = set(('main', 'sub'))
 	default_handler = 'intamac_stream'
 
 	def __init__(self, param=None, *args, **kwargs):
+		'''
+		Class constructor that builds the manually
+		the XML of the stanza. This procedure is needed
+		at the moment to be able to include text into
+		the stanza root elements, as the default 
+		functionality does not seem to allow that. 
+		After defining the XML body of the stanza, 
+		ElementBase is initiated passing the body of the
+		stanza as an argument for the `xml` parameter
+		of the ElementBase class. 
+		'''
 		ET.register_namespace('', 'intamac:intamacstream')
 		root = ET.Element('{intamac:intamacstream}intamacstream')
 		root.text = param
@@ -78,7 +153,27 @@ class IntamacAPI(ElementBase):
 	sub_interfaces = set(('SoundPackList',))
 	default_handler = 'intamac_api'
 
-	def __init__(self, soundpacklist=False, tag=None, enabled=None, sensitivity=None, type=None, url=None, param='', *args, **kwargs):
+	def __init__(self, 
+				soundpacklist=False, 
+				tag=None, 
+				enabled=None, 
+				sensitivity=None, 
+				type=None, 
+				url=None, 
+				param='', 
+				*args, 
+				**kwargs):
+		'''
+		Class constructor that builds the manually
+		the XML of the stanza. This procedure is needed
+		at the moment to be able to include text into
+		the stanza root elements, as the default 
+		functionality does not seem to allow that. 
+		After defining the XML body of the stanza, 
+		ElementBase is initiated passing the body of the
+		stanza as an argument for the `xml` parameter
+		of the ElementBase class. 
+		'''
 		# Do we want to make checks on the values passed as parameters for each of
 		# these tags? For example, do we want to ensure that enabled is only True
 		# or False, or that tag is only one of Aggression, BabyCry, CarAlarm, etc.? 
@@ -101,6 +196,13 @@ class IntamacAPI(ElementBase):
 
 
 class IntamacEvent(ElementBase):
+		'''
+		Class constructor that builds the manually
+		the XML of the stanza. This procedure is needed
+		at the moment to be able to include text into
+		the stanza root elements, as the default 
+		functionality does not seem to allow that. 
+		'''
 	name = 'intamacevent'
 	namespace = 'intamac:intamacevent'
 	plugin_attrib = 'iq_intamacevent'
@@ -108,6 +210,17 @@ class IntamacEvent(ElementBase):
 	default_handler = 'intamac_event'
 
 	def __init__(self, event=None, *args, **kwargs):
+		'''
+		Class constructor that builds the manually
+		the XML of the stanza. This procedure is needed
+		at the moment to be able to include text into
+		the stanza root elements, as the default 
+		functionality does not seem to allow that. 
+		After defining the XML body of the stanza, 
+		ElementBase is initiated passing the body of the
+		stanza as an argument for the `xml` parameter
+		of the ElementBase class. 
+		'''
 		ET.register_namespace('', 'intamac:intamacevent')
 		root = ET.Element('{intamac:intamacevent}intamacevent')
 		root.text = event
@@ -121,6 +234,8 @@ class IntamacEvent(ElementBase):
 class Config(ElementBase):
 
 	"""
+	:author: Nathanael C. Fritz. 
+	:source: 
 	In order to make loading and manipulating an XML config
 	file easier, we will create a custom stanza object for
 	our config XML file contents. See the documentation
