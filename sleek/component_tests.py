@@ -68,8 +68,10 @@ import sys
 import logging
 import time
 from optparse import OptionParser
-
 import threading 
+
+from queueing_system import queue_send
+from db_access.sql_server_interface import get_connection, get_data
 
 import sleekxmpp
 from sleekxmpp import roster
@@ -188,11 +190,32 @@ class ConfigComponent(ComponentXMPP):
         #self.add_event_handler("message", self.message, threaded=threaded)
         #self.add_event_handler('iq', self.iq, threaded=True)
 
+        if self.check_is_first(self):
+        	self.check_status_devices()
+
     # The usefulness of this class method is not yet clear, but might prove useful
     # later on. 
     @classmethod
     def variables(cls):
         return cls.__dict__
+
+    def start(self, event):
+        # Using the method send_presence() without arguments should just work. The problem
+        # is that ejabberd then takes the presence from the component (muc.localhost) and 
+        # sends it to itself (muc.localhost), resulting in an error. The error seems to 
+        # arise from the fact that a presence is being sent from a JID to the same JID.
+        # The solution that I can think of for the moment is to explicitly define 
+        # a specific destination and a different sender JID. 
+        self.send_presence(pto=connections[1], pfrom=self.boundjid.bare, ptype='probe')
+
+    def check_status_devices(self):
+    	devices = self.obtain_list_devices()
+
+    def obtain_list_devices(self):
+    	pass
+
+    def check_is_first(self):
+    	return True
 
     def presence(self, presence):
         print(presence)
@@ -203,15 +226,6 @@ class ConfigComponent(ComponentXMPP):
         if self.boundjid.bare not in _from:
             self.send_presence(pto=_from, pfrom=self.boundjid.bare + '/test')
         '''
-
-    def start(self, event):
-        # Using the method send_presence() without arguments should just work. The problem
-        # is that ejabberd then takes the presence from the component (muc.localhost) and 
-        # sends it to itself (muc.localhost), resulting in an error. The error seems to 
-        # arise from the fact that a presence is being sent from a JID to the same JID.
-        # The solution that I can think of for the moment is to explicitly define 
-        # a specific destination and a different sender JID. 
-        self.send_presence(pto=connections[1], pfrom=self.boundjid.bare, ptype='probe')
 
     def subscribe(self, presence):
         print(presence)
@@ -252,6 +266,7 @@ class ConfigComponent(ComponentXMPP):
         if info['type'] != 'result':
         #self.make_iq_result(id=info['id'], ito=info['from'], ifrom=self.boundjid.bare + '/test').send()
             info.reply().send()
+        queue_send(info)
 
     def intamac_stream(self, stream):
         print(stream)
