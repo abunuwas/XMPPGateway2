@@ -70,7 +70,7 @@ import time
 from optparse import OptionParser
 import threading 
 
-from queueing_system import queue_send
+from queueing_system.queueing import queue_push
 from db_access.sql_server_interface import get_connection, get_data
 
 import sleekxmpp
@@ -266,7 +266,7 @@ class ConfigComponent(ComponentXMPP):
         if info['type'] != 'result':
         #self.make_iq_result(id=info['id'], ito=info['from'], ifrom=self.boundjid.bare + '/test').send()
             info.reply().send()
-        queue_send(info)
+        queue_push(info)
 
     def intamac_stream(self, stream):
         print(stream)
