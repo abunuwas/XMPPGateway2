@@ -207,6 +207,7 @@ class ConfigComponent(ComponentXMPP):
         # The solution that I can think of for the moment is to explicitly define 
         # a specific destination and a different sender JID. 
         self.send_presence(pto=connections[1], pfrom=self.boundjid.bare, ptype='probe')
+        self.poll_queue()
 
     def check_status_devices(self):
     	devices = self.obtain_list_devices()
@@ -303,6 +304,9 @@ class ConfigComponent(ComponentXMPP):
         letting it know that the respective device is online.
         '''
         print(delay)
+
+    def poll_queue(self, queue=None):
+        pass
 
 
 
