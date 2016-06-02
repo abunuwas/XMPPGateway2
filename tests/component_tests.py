@@ -15,54 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-:module: sleek.custom_stanzas.
-:author: Jose Haro (jharoperalta@intamac.com).
-:synopsis: Custom stanza implementations. 
-:platforms: Linux and Unix.
-:python-version: Python 3. 
-
-This module defines a class to implement the Component kind
-of connection to the XMPP server. 
-
-.. WARNING:: In its current state, the module defines only a basic
-             implementation of the component. Further additions are 
-             needed in the following direction:
-             - Ensures that the component actually deals correctly
-               with all sort of stanzas coming to it.
-             - Include `try`-`except` clauses to catch all sort of
-               possible exceptions that might be raised in different
-               situations.
-             - Enable logging functionality.
-             - Enable proper management capabilities for the flow of
-               communication with the DVRs. 
-             - Separate the testing functionality into a test-oriented
-               implementation of the component. 
-             - Ensure that the available plugins from the SleekXMPP
-               library are used and leveraged to the highest extent
-               possible. 
-             - Ensure also that the currently registered plugins are
-               used properly and to the highest extent possible. 
-             - Include functionality to manage the component roster.
-             - Ensure that the path chosen to deal with custom stanzas
-               (both plugin registartion and custom class implementation
-               of the method listeners to process received stanzas) is
-               the most adequate to facilitate the highest possible 
-               separation of concerns in the further development of 
-               this codebase. For example, if state is not needed to
-               deal with the stanzas, their custom processing methods 
-               could be implemented in the code of the actual stanzas,
-               thereby keeping the component code short, clean, and 
-               isolated from issues that might not be its concern here. 
-             - Ensure that by all means presence stanzas are handled in
-               the most efficient and expected way. 
-             - Include parameters to allow the initialization of the 
-               component in threaded mode or not. 
-
-Classes
--------
-.. ConfigComponent
-"""
 
 import sys
 import logging
