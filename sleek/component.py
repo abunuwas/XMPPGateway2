@@ -69,9 +69,10 @@ import logging
 import time
 from optparse import OptionParser
 import threading 
+import os
 
-from queueing_system.queueing import queue_push
-from db_access.sql_server_interface import get_connection, get_data
+from XMPPGateway.queueing_system.queueing import queue_push
+from XMPPGateway.db_access.sql_server_interface import get_connection, get_data
 
 import sleekxmpp
 from sleekxmpp import roster
@@ -86,7 +87,7 @@ from sleekxmpp.xmlstream.handler.callback import Callback
 from sleekxmpp.xmlstream.matcher.xpath import MatchXPath
 from sleekxmpp.xmlstream.matcher import StanzaPath
 
-from sleek.custom_stanzas import (DeviceInfo, 
+from XMPPGateway.sleek.custom_stanzas import (DeviceInfo, 
                                 IntamacStream, 
                                 IntamacFirmwareUpgrade, 
                                 IntamacAPI, 
@@ -96,8 +97,6 @@ from sleek.custom_stanzas import (DeviceInfo,
 
 import atexit 
 
-
-register_stanza_plugin(Config, Roster)
 
 # The three lines of code below serve testing purposes. They should
 # not be present in production code. 
@@ -111,7 +110,7 @@ connections = ['c42f90b752dd@use-xmpp-01/camera',
                 'user0@use-xmpp-01']
 
 
-class ConfigComponent(ComponentXMPP):
+class Component(ComponentXMPP):
 
     """
     A simple SleekXMPP component that uses an external XML
@@ -122,12 +121,15 @@ class ConfigComponent(ComponentXMPP):
 
     def __init__(self, config):
         """
-        Create a ConfigComponent.
+        Create a Component.
 
         Arguments:
             config      -- The XML contents of the config file.
             config_file -- The XML config file object itself.
         """
+
+        register_stanza_plugin(Config, Roster)
+
         ComponentXMPP.__init__(self, config['jid'],
                                      config['secret'],
                                      config['server'],
@@ -190,8 +192,14 @@ class ConfigComponent(ComponentXMPP):
         #self.add_event_handler("message", self.message, threaded=threaded)
         #self.add_event_handler('iq', self.iq, threaded=True)
 
-        if self.check_is_first(self):
+        if self.check_is_first():
         	self.check_status_devices()
+
+        self.registerPlugin('xep_0030') # Service Discovery
+        self.registerPlugin('xep_0004') # Data Forms
+        self.registerPlugin('xep_0060') # PubSub
+        self.registerPlugin('xep_0199') # XMPP Ping
+        self.registerPlugin('xep_0203') # Delayed stanzas
 
     # The usefulness of this class method is not yet clear, but might prove useful
     # later on. 
@@ -314,7 +322,7 @@ class ConfigComponent(ComponentXMPP):
     ## CODE FOR COMMUNICATION WITH THE DEVICES ##
     #############################################
 
-    def intamac_firmware_upgrade(self):
+    def intamac_firmware_upgrade_send(self):
         upgrade = IntamacFirmwareUpgrade()
         upgrade['location'] = "https://stg.upgrade.swann.intamac.com/swa_firmware_v505_151020.dav"
         #print(upgrade)
@@ -322,7 +330,7 @@ class ConfigComponent(ComponentXMPP):
         resp = [iq.send(timeout=5) for iq in iqs]
         return resp 
 
-    def intamac_api(self):
+    def intamac_api_send(self):
         text = '&lt;SoundPackList&gt;&lt;SoundPack&gt;&lt;tag&gt;Aggression&lt;/tag&gt;&lt;enabled&gt;false&lt;/enabled&gt;&lt;sensitivity&gt;50&lt;/sensitivity&gt;&lt;/SoundPack&gt;&lt;SoundPack&gt;&lt;tag&gt;BabyCry&lt;/tag&gt;&lt;enabled&gt;false&lt;/enabled&gt;&lt;sensitivity&gt;50&lt;/sensitivity&gt;&lt;/SoundPack&gt;&lt;SoundPack&gt;&lt;tag&gt;CarAlarm&lt;/tag&gt;&lt;enabled&gt;false&lt;/enabled&gt;&lt;sensitivity&gt;50&lt;/sensitivity&gt;&lt;/SoundPack&gt;&lt;SoundPack&gt;&lt;tag&gt;GlassBreak&lt;/tag&gt;&lt;enabled&gt;false&lt;/enabled&gt;&lt;sensitivity&gt;50&lt;/sensitivity&gt;&lt;/SoundPack&gt;&lt;SoundPack&gt;&lt;tag&gt;Gunshot&lt;/tag&gt;&lt;enabled&gt;false&lt;/enabled&gt;&lt;sensitivity&gt;50&lt;/sensitivity&gt;&lt;/SoundPack&gt;&lt;SoundPack&gt;&lt;tag&gt;SmokeAlarm&lt;/tag&gt;&lt;enabled&gt;false&lt;/enabled&gt;&lt;sensitivity&gt;50&lt;/sensitivity&gt;&lt;/SoundPack&gt;&lt;/SoundPackList&gt;'
         text2 = '<SoundPackList><SoundPack><tag>Aggression</tag><enabled>false</enabled><sensitivity>100</sensitivity></SoundPack><SoundPack><tag>BabyCry</tag><enabled>false</enabled><sensitivity>50</sensitivity></SoundPack><SoundPack><tag>CarAlarm</tag><enabled>true</enabled><sensitivity>50</sensitivity></SoundPack><SoundPack><tag>GlassBreak</tag><enabled>true</enabled><sensitivity>50</sensitivity></SoundPack><SoundPack><tag>Gunshot</tag><enabled>false</enabled><sensitivity>50</sensitivity></SoundPack><SoundPack><tag>SmokeAlarm</tag><enabled>false</enabled><sensitivity>50</sensitivity></SoundPack></SoundPackList>'
         api = IntamacAPI(param=text2, url="/Event/audioanalyse", type='1', soundpacklist=False)
@@ -332,7 +340,7 @@ class ConfigComponent(ComponentXMPP):
         resp = [iq.send(timeout=5) for iq in iqs]
         return resp 
 
-    def intamac_stream(self):
+    def intamac_stream_send(self):
         stream = IntamacStream('000000000000000000000000000000000000000000000000000000000000', 
             ip='192.168.1.100', 
             port='5000', 
@@ -344,39 +352,23 @@ class ConfigComponent(ComponentXMPP):
         resp = [iq.send(timeout=5) for iq in iqs]
         return resp       
 
+def make_component(config_path, cls, block=False):
+    config_file = open(config_path, 'r+')
+    config_data = "\n".join([line for line in config_file])
+    config = Config(xml=ET.fromstring(config_data))
+    config_file.close()
+    xmpp = cls(config)
+    xmpp.connect()
+    xmpp.process(block=block)
+    return xmpp
 
 
-def presses(xmpp):
-    while True:
-        key = input('Enter command: ')
-        if key == 'send_iq':
-            xmpp.iq_send()
-        if key == 'subscribe':
-            xmpp.send_subscriptions()
-        if key == 'send_message':
-            xmpp.bot_message()
-        if key == 'unsubscribe':
-            xmpp.send_unsubscriptions()
-        if key == 'chat':
-            xmpp.chat_send()
-        if key == 'message':
-            xmpp.bot_message()
-        if key == 'disconnect':
-            xmpp.disconnect()
-        if key == 'stream':
-            xmpp.intamac_stream()
-        if key == 'upgrade':
-            xmpp.intamac_firmware_upgrade()
-        if key == 'api':
-            xmpp.intamac_api()
-        if key == 'ping':
-            xmpp.intamac_ping()
-        if key == 'event':
-            xmpp.intamac_event()
-        if key == 'info':
-            xmpp.device_info()
 
 if __name__ == '__main__':
+
+    config_dir = os.path.abspath(os.path.join(os.pardir, 'config'))
+    local_config_file = os.path.join(config_dir, 'config_local.xml')
+    prod_config_file = os.path.join(config_dir, 'config.xml')
 
     def exit_handler():
         xmpp.disconnect()
@@ -387,17 +379,17 @@ if __name__ == '__main__':
                         format='%(levelname)-8s %(message)s')
 
     # Load configuration data.
-    config_file = open('config.xml', 'r+')
+    config_file = open(prod_config_file, 'r+')
     config_data = "\n".join([line for line in config_file])
     config = Config(xml=ET.fromstring(config_data))
     config_file.close()
 
-    xmpp = ConfigComponent(config)   
-    xmpp.registerPlugin('xep_0030') # Service Discovery
-    xmpp.registerPlugin('xep_0004') # Data Forms
-    xmpp.registerPlugin('xep_0060') # PubSub
-    xmpp.registerPlugin('xep_0199') # XMPP Ping
-    xmpp.registerPlugin('xep_0203') # Delayed stanzas
+    xmpp = Component(config)
+    #xmpp.registerPlugin('xep_0030') # Service Discovery
+    #xmpp.registerPlugin('xep_0004') # Data Forms
+    #xmpp.registerPlugin('xep_0060') # PubSub
+    #xmpp.registerPlugin('xep_0199') # XMPP Ping
+    #xmpp.registerPlugin('xep_0203') # Delayed stanzas
 
     # Connect to the XMPP server and start processing XMPP stanzas.
     if xmpp.connect():
