@@ -71,6 +71,8 @@ from optparse import OptionParser
 import threading 
 import os
 
+import boto3
+
 from XMPPGateway.queueing_system.queueing import queue_push
 from XMPPGateway.db_access.sql_server_interface import get_connection, get_data
 
@@ -248,7 +250,7 @@ class Component(ComponentXMPP):
         print('This should be subscribed: ', presence['type'])
         self.send_presence(pto=presence['from'], pfrom=self.boundjid.bare, ptype='subscribed')        
         
-
+    '''
     def message(self, msg):
         print(msg)
         messages.append(msg)
@@ -258,14 +260,16 @@ class Component(ComponentXMPP):
             print(_from)
             print(self.boundjid.bare)
             msg.reply("Thanks for sending\n%(body)s" % msg).send()
+    '''
 
     def probe(self, probe):
-        print('This should be probe: ', probe['type'])
-        print(probe)
+        #print('This should be probe: ', probe['type'])
+        #print(probe)
+        pass
 
     def iq(content):
-        print(content)
-        print('ORIGIN IS: ', content['from'])
+        #print(content)
+        #print('ORIGIN IS: ', content['from'])
         #self.make_iq_result(ito=content['from'], id=['id'], ifrom=self.boundjid.bare  + '/test').send()
         content.reply().send()
 
@@ -292,8 +296,8 @@ class Component(ComponentXMPP):
         #self.make_iq_result(id=upgrade['id'], ito=upgrade['from'], ifrom=self.boundjid.bare + '/test').send()
             upgrade.reply().send()
 
-    def intamac_api(self, api):
-        print(api)
+    def intamac_api(self, api, *args, **kwargs):
+        #print(api)
         origin = JID(api['from']).bare
         if api['type'] != 'result':
         #self.make_iq_result(id=api['id'], ito=api['from'], ifrom=self.boundjid.bare + '/test').send()
@@ -314,7 +318,29 @@ class Component(ComponentXMPP):
         print(delay)
 
     def poll_queue(self, queue=None):
-        pass
+        outcomes = {}
+        sqs = boto3.resource('sqs')
+        queue = sqs.get_queue_by_name(QueueName='test')
+        print('listening to the queue...')
+        now = datetime.datetime.now()
+        end = now + datetime.timedelta(seconds=5)
+        print(end)
+        while datetime.datetime.now() < end:
+            for message in queue.receive_messages():
+                #print(message.body)
+                data = message.body.split('_')
+                if data[0] not in outcomes.keys():
+                    outcomes[data[0]] = [data]
+                else:
+                    outcomes[data[0]].append(data)
+                message.delete()
+        print('printing outcomes...')
+        for key, value in outcomes:
+            print(key)
+            print('-'*10)
+            for data in value:
+                print(data)
+
 
 
 
@@ -350,16 +376,17 @@ class Component(ComponentXMPP):
         #print(stream)
         iqs = [self.make_iq_set(sub=stream, ito=conn, ifrom=self.boundjid.bare) for conn in connections]
         resp = [iq.send(timeout=5) for iq in iqs]
-        return resp       
+        return resp 
 
-def make_component(config_path, cls, block=False):
+def make_component(config_path, cls, connect=False, block=False, *args, **kwargs):
     config_file = open(config_path, 'r+')
     config_data = "\n".join([line for line in config_file])
     config = Config(xml=ET.fromstring(config_data))
     config_file.close()
     xmpp = cls(config)
-    xmpp.connect()
-    xmpp.process(block=block)
+    if connect:
+        xmpp.connect()
+        xmpp.process(block=block)
     return xmpp
 
 
@@ -375,8 +402,8 @@ if __name__ == '__main__':
 
     atexit.register(exit_handler)
 
-    logging.basicConfig(level=logging.DEBUG,
-                        format='%(levelname)-8s %(message)s')
+    #logging.basicConfig(level=logging.DEBUG,
+    #                    format='%(levelname)-8s %(message)s')
 
     # Load configuration data.
     config_file = open(prod_config_file, 'r+')
@@ -394,7 +421,7 @@ if __name__ == '__main__':
     # Connect to the XMPP server and start processing XMPP stanzas.
     if xmpp.connect():
         xmpp.process(block=False)
-        thread2 = threading.Thread(target=presses, args=(xmpp,))
+        thread2 = threading.Thread(args=(xmpp,))
         thread2.start()
         print("Done")
     else:
