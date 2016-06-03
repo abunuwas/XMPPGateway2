@@ -53,19 +53,19 @@ of communication with the XMPP clients.
 Stanza Classes
 --------------
 .. DeviceInfo
-   :namespace: 'intamac:intamacdeviceinfo'
+   :namespace: 'intamac:intamacdeviceinfo' # from camera to component, component replies
 .. IntamacStream
-   :namespace: 'intamac:intamacstream'
+   :namespace: 'intamac:intamacstream' # from component to camera, and we receive the result reply from camera, streaming blabla
 .. IntamacFirmwareUpgrade
-   :namespace: 'intamac:intamacfirmwareupgrade'
+   :namespace: 'intamac:intamacfirmwareupgrade' # from component to camera, receive response if it worked or not, normally OK, sometimes API failed...
 .. IntamacSetting
-   :namespace: 'intamac:intamacsetting'
+   :namespace: 'intamac:intamacsetting' # same, response if it worked or not
 .. IntamacAPI
-   :namespace: 'intamac:intamacapi'
+   :namespace: 'intamac:intamacapi' # same, response OK or failed to iq set; when we send get we'll receive the whole string with device activity info
 .. IntamacEvent
-   :namespace: 'intamac:intamacevent'
+   :namespace: 'intamac:intamacevent' # from camera to component, normal reply, camera doesn't make checks
 .. Config
-   :namespace: 'sleekxmpp:config'
+   :namespace: 'sleekxmpp:config' # 
 """
 
 from sleekxmpp.xmlstream.stanzabase import ET
