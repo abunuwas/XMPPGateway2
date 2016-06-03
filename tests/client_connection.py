@@ -34,7 +34,11 @@ import threading
 
 import curses
 
-from XMPPGateway.sleek.custom_stanzas import DeviceInfo, IntamacStream, IntamacFirmwareUpgrade, IntamacAPI, IntamacEvent
+from XMPPGateway.sleek.custom_stanzas import (DeviceInfo, 
+                                              IntamacStream, 
+                                              IntamacFirmwareUpgrade, 
+                                              IntamacAPI, 
+                                              IntamacEvent)
 
 
 strings = '&lt;xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;&gt;&lt;DeviceInfo version=&quot;1.0&quot;&gt;&lt;deviceName&gt;IP CAMERA&lt;/deviceName&gt;&lt;deviceID&gt;88&lt;/deviceID&gt;&lt;deviceDescription&gt;IPCamera&lt;/deviceDescription&gt;&lt;deviceLocation&gt;STD-CGI&lt;/deviceLocation&gt;&lt;systemContact&gt;STD-CGI&lt;/systemContact&gt;&lt;model&gt;SWO-SVC01K&lt;/model&gt;&lt;serialNumber&gt;SWO-SVC01K0120150427CCRR516288616&lt;/serialNumber&gt;&lt;macAddress&gt;bc:51:fe:83:27:7d&lt;/macAddress&gt;&lt;firmwareVersion&gt;V5.0.5&lt;/firmwareVersion&gt;&lt;firmwareReleasedDate&gt;151020&lt;/firmwareReleasedDate&gt;&lt;bootVersion&gt;V1.3.4&lt;/bootVersion&gt;&lt;bootReleasedDate&gt;100316&lt;'
@@ -52,6 +56,11 @@ class Client(sleekxmpp.ClientXMPP):
         self.add_event_handler('presence_subscribe', self.subscribe, threaded=True)
         self.add_event_handler('presence_subscribed', self.subscribed, threaded=True)
         #self.add_event_handler('presence', self.presence)
+
+        self.registerPlugin('xep_0030') # Service Discovery
+        self.registerPlugin('xep_0004') # Data Forms
+        self.registerPlugin('xep_0060') # PubSub
+        self.registerPlugin('xep_0199') # XMPP Ping
 
     def start(self, event):
         self.send_presence()
@@ -187,19 +196,12 @@ class Client(sleekxmpp.ClientXMPP):
         return resp 
 
 
-def make_bot(username):
+def make_bot(username, connect=False, block=False):
     xmpp = Client(username + '@use-xmpp-01/test', 'mypassword')
-    xmpp.registerPlugin('xep_0030') # Service Discovery
-    xmpp.registerPlugin('xep_0004') # Data Forms
-    xmpp.registerPlugin('xep_0060') # PubSub
-    xmpp.registerPlugin('xep_0199') # XMPP Ping
-    if xmpp.connect(('52.71.184.144', 5222), use_tls=True, use_ssl=False):
-        print('connecting...')
-        xmpp.process(block=False)
-        print('Done')
-        return xmpp
-    else:
-        print('Unable to connect')
+    if connect:
+        xmpp.connect(('52.71.184.144', 5222), use_tls=True, use_ssl=False)
+        xmpp.process(block=block)
+    return xmpp
 
 
 def presses(xmpp):

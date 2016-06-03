@@ -4,11 +4,12 @@ from unittest import TestCase
 import os
 from xml.etree import ElementTree as ET
 import logging 
+import atexit
 
 from client_connection import make_bot
 
 from XMPPGateway.sleek.component import Component, make_component
-from XMPPGateway.sleek.custom_stanzas import Config
+from XMPPGateway.sleek.custom_stanzas import Config, IntamacAPI
 #from XMPPGateway.db_access.sql_sever_interface import DB
 #from queueing_systems.sqs import SQS
 #from queueing_systems.kinesis import Kinesis
@@ -18,6 +19,12 @@ config_dir = os.path.abspath(os.path.join(os.pardir, 'config'))
 local_config_file = os.path.join(config_dir, 'config_local.xml')
 prod_config_file = os.path.join(config_dir, 'config.xml')
 
+def exit_handler():
+    pass 
+    #xmpp.disconnect()
+
+atexit.register(exit_handler)
+
 
 class TestComponent(Component):
     '''
@@ -26,12 +33,14 @@ class TestComponent(Component):
     behavior for testing purposes. 
     '''
     def __init__(self, *args, **kwargs):
-        Component.__init__(self, *args, **kwargs)
         self.test_stanzas = []
-
-    def intamac_api(self, *args, **kwargs):
-        self.test_stanzas.append(args)
-        Component.intamac_api(self, *args, **kwargs)
+        super(TestComponent, self).__init__(*args, **kwargs)
+        
+    def intamac_api(self, api):
+        api_str = str(api)
+        self.api_stanza = api_str
+        super(TestComponent, self).intamac_api(api)
+        self.api_stanza_response = str(api)
 
 
 class TestQueues(TestCase):
@@ -45,13 +54,9 @@ class TestQueues(TestCase):
 class TestStanzas(TestCase):
     
     def setUp(self):
-        self.component = make_component(config_path=prod_config_file, cls=TestComponent)
-        print(self.component.boundjid)
+        #self.component = make_component(config_path=prod_config_file, cls=TestComponent)
+        #print(self.component.boundjid)
         self.bot = make_bot('user1')
-
-    def tearDown(self):
-        self.component.disconnect()
-        self.bot.disconnect()
 
     def test_intamac_api_stanza(self):
         #logging.basicConfig(level=logging.DEBUG, format='%(levelname)-8s %(message)s')
@@ -60,7 +65,11 @@ class TestStanzas(TestCase):
             'url': '/Event/audioanalyse',
             'type': '1'
         }
-        self.bot.intamac_api(**params)
+        #self.bot.intamac_api(**params)
+        api = IntamacAPI(**params)
+        iq = self.bot.make_iq_set(sub=api, ito='whoever', ifrom=self.bot.boundjid.bare)
+        iq_xml = ET.fromstring(str(iq))
+        #self.component.intamac_api(iq)
         #print('Response is: ', response)
         # The client includes the response into a list. In
         # this case, we expect this list to contain just one
@@ -71,22 +80,17 @@ class TestStanzas(TestCase):
         #response_string = str(response[0])
         #response_xml = ET.fromstring(response_string)
         # Build a list with each element of the XML:
-        #elements = [element for element in response_xml.iter()]
+        elements = [element for element in iq_xml.iter()]
         #print(elements)
         # Get pointers to respectively to the root and the child
         # elements:
-        #root, child = elements[0], elements[1]
+        root, child = elements[0], elements[1]
         # We expect the following parameters in the XML of the
-        # response:
-        #self.assertEqual(root.tag, 'iq')
-        #self.assertEqual(child.tag, 'intamacapi')
-        #self.assertEqual(child.url, params['url'])
-        #self.assertEqual(child.type, params['type'])
-        
-        #self.component.intamac_api(api='asdf')
-        #self.assertTrue(self.component)
-        print('TEST STANZAS ARE: ', self.component.test_stanzas)
-
+        # stanza:
+        self.assertEqual(root.tag, 'iq')
+        self.assertEqual(child.tag, '{intamac:intamacapi}intamacapi')
+        self.assertEqual(child.attrib['url'], params['url'])
+        self.assertEqual(child.attrib['type'], params['type'])
 
 
 class TestComponentConnection(TestCase):
@@ -130,17 +134,18 @@ class TestComponentBehavior(TestCase):
         pass
 
     def test_intamac_api(self):
-        response = self.bot.intamac_api()
+        #response = self.bot.intamac_api()
         # The client includes the response into a list. In
         # this case, we expect this list to contain just one
         # element. 
-        self.assertEqual(len(response), 1)
+        #self.assertEqual(len(response), 1)
         # Get a string representation of the of response stanza
         # and build an ElementTree object from it:
-        response_string = str(response[0])
-        response_xml = ET.fromstring(response_string)
+        #response_string = str(response[0])
+        #response_xml = ET.fromstring(response_string)
         # Expect the tag of the element to be iq:
-        self.assertTrue(response_xml.tag, 'iq')
+        #self.assertTrue(response_xml.tag, 'iq')
+        pass
 
 
 if __name__ == '__main__':
