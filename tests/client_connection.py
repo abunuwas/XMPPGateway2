@@ -27,6 +27,10 @@ from sleekxmpp.stanza.iq import Iq
 from sleekxmpp.xmlstream.stanzabase import ET, registerStanzaPlugin
 from sleekxmpp.xmlstream import ElementBase, StanzaBase
 from sleekxmpp.exceptions import IqTimeout, IqError
+from sleekxmpp.xmlstream.stanzabase import ET, registerStanzaPlugin, register_stanza_plugin
+from sleekxmpp.xmlstream.handler.callback import Callback
+from sleekxmpp.xmlstream.matcher import StanzaPath
+from sleekxmpp.jid import JID
 
 import atexit
 
@@ -37,6 +41,7 @@ import curses
 from XMPPGateway.sleek.custom_stanzas import (DeviceInfo, 
                                               IntamacStream, 
                                               IntamacFirmwareUpgrade, 
+                                              IntamacSetting,
                                               IntamacAPI, 
                                               IntamacEvent)
 
@@ -61,6 +66,22 @@ class Client(sleekxmpp.ClientXMPP):
         self.registerPlugin('xep_0004') # Data Forms
         self.registerPlugin('xep_0060') # PubSub
         self.registerPlugin('xep_0199') # XMPP Ping
+
+        custom_stanzas = {
+            IntamacStream: self._intamac_stream,
+            IntamacFirmwareUpgrade: self._intamac_firmware_upgrade,
+            IntamacSetting: self._intamac_setting,
+            IntamacAPI: self._intamac_api,
+        }
+
+        for custom_stanza, handler in custom_stanzas.items():
+            register_stanza_plugin(Iq, custom_stanza)
+            self.register_handler(
+                Callback(custom_stanza.plugin_attrib,
+                    StanzaPath('iq@type=set/{}'.format(custom_stanza.plugin_attrib)),
+                    handler)
+                )
+
 
     def start(self, event):
         self.send_presence()
@@ -154,10 +175,19 @@ class Client(sleekxmpp.ClientXMPP):
             self.send_presence(pto=conn, ptype='unsubscribe')
 
     def intamac_firmware_upgrade(self):
-        upgrade = IntamacFirmwareUpgrade()
-        upgrade['location'] = "https://stg.upgrade.swann.intamac.com/swa_firmware_v505_151020.dav"
+        location = "https://stg.upgrade.swann.intamac.com/swa_firmware_v505_151020.dav"
+        upgrade = IntamacFirmwareUpgrade(location=location)
+        #upgrade['location'] = "https://stg.upgrade.swann.intamac.com/swa_firmware_v505_151020.dav"
         #print(upgrade)
         iqs = [self.make_iq_set(sub=upgrade, ito=conn, ifrom=self.boundjid.bare) for conn in connections]
+        resp = [iq.send(timeout=5) for iq in iqs]
+        return resp 
+
+    def intamac_setting(self):
+        setting = IntamacSetting()
+        setting['xmppip'] = "192.168.1.100"
+        setting['buddy'] = 'mzclientxmppapp@xmpp.intamac.com/xmppadmin" xmlns="intamac:intamacsetting'
+        iqs = [self.make_iq_set(sub=setting, ito=conn, ifrom=self.boundjid.bare) for conn in connections]
         resp = [iq.send(timeout=5) for iq in iqs]
         return resp 
 
@@ -194,6 +224,35 @@ class Client(sleekxmpp.ClientXMPP):
         iqs = [self.make_iq_set(sub=event, ito=conn, ifrom=self.boundjid.bare) for conn in connections]
         resp = [iq.send(timeout=5) for iq in iqs]
         return resp 
+
+    ################# HANDLE STANZAS SENT BY THE COMPONENT #############
+
+    def _intamac_stream(self, stream):
+        print(stream)
+        origin = JID(stream['from']).bare
+        if stream['type'] != 'result':
+            stream.reply().send(to='muc@test.use-xmpp-01/test')
+        #self.make_iq_result(id=stream['id'], ito=stream['from'], ifrom=self.boundjid.bare + '/test').send()
+        
+    def _intamac_firmware_upgrade(self, upgrade):
+        print(upgrade)
+        origin = JID(upgrade['from']).bare
+        if upgrade['type'] != 'result':
+        #self.make_iq_result(id=upgrade['id'], ito=upgrade['from'], ifrom=self.boundjid.bare + '/test').send()
+            upgrade.reply().send()
+
+    def _intamac_setting(self, setting):
+        print(setting)
+        origin = JID(setting['from']).bare
+        if setting['type'] != 'result':
+            setting.reply().send()
+
+    def _intamac_api(self, api, *args, **kwargs):
+        #print(api)
+        origin = JID(api['from']).bare
+        if api['type'] != 'result':
+        #self.make_iq_result(id=api['id'], ito=api['from'], ifrom=self.boundjid.bare + '/test').send()
+            api.reply().send()
 
 
 def make_bot(username, connect=False, block=False):
@@ -233,6 +292,8 @@ def presses(xmpp):
             xmpp.intamac_event()
         if key == 'info':
             xmpp.device_info()
+        if key == 'setting':
+            xmpp.intamac_setting()
 
 
 if __name__ == '__main__':
@@ -246,7 +307,7 @@ if __name__ == '__main__':
     #thread1 = threading.Thread(target=make_bot, args=('user0',))
     
 
-    xmpp = Client('user0' + '@use-xmpp-01/test', 'mypassword')
+    xmpp = Client('user1' + '@use-xmpp-01/test', 'mypassword')
     xmpp.registerPlugin('xep_0030') # Service Discovery
     xmpp.registerPlugin('xep_0004') # Data Forms
     xmpp.registerPlugin('xep_0060') # PubSub
