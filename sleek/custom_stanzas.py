@@ -136,6 +136,26 @@ class IntamacFirmwareUpgrade(ElementBase):
     interfaces = set(('location',))
     default_handler = 'intamac_firmware_upgrade'
 
+    def __init__(self, *args, **kwargs):
+        '''
+        Class constructor that builds the manually
+        the XML of the stanza. This procedure is needed
+        at the moment to be able to include text into
+        the stanza root elements, as the default 
+        functionality does not seem to allow that. 
+        After defining the XML body of the stanza, 
+        ElementBase is initiated passing the body of the
+        stanza as an argument for the `xml` parameter
+        of the ElementBase class. 
+        '''
+        ET.register_namespace('', 'intamac:intamacfirmwareupgrade')
+        root = ET.Element('{intamac:intamacfirmwareupgrade}intamacfirmwareupgrade')
+        ElementBase.__init__(self, xml=root)
+        for key in kwargs:
+            if key in self.interfaces:
+                self[key] = kwargs[key]
+
+
 
 class IntamacSetting(ElementBase):
     name = 'intamacsetting'
@@ -144,21 +164,35 @@ class IntamacSetting(ElementBase):
     interfaces = set(('xmppip', 'buddy', 'xmppport', 'eventwait', 'apiport'))
     default_handler = 'intamac_setting'
 
+    def __init__(self, param=None, *args, **kwargs):
+        '''
+        Class constructor that builds the manually
+        the XML of the stanza. This procedure is needed
+        at the moment to be able to include text into
+        the stanza root elements, as the default 
+        functionality does not seem to allow that. 
+        After defining the XML body of the stanza, 
+        ElementBase is initiated passing the body of the
+        stanza as an argument for the `xml` parameter
+        of the ElementBase class. 
+        '''
+        ET.register_namespace('', 'intamac:intamacsetting')
+        root = ET.Element('{intamac:intamacsetting}intamacsetting')
+        ElementBase.__init__(self, xml=root)
+        for key in kwargs:
+            if key in self.interfaces:
+                self[key] = kwargs[key]
+
 
 class IntamacAPI(ElementBase):
     name = 'intamacapi'
     namespace = 'intamac:intamacapi'
-    interfaces = set(('url', 'type', 'SoundPackList'))
+    interfaces = set(('url', 'type'))
     plugin_attrib = 'iq_intamacapi'
-    sub_interfaces = set(('SoundPackList',))
     default_handler = 'intamac_api'
 
     def __init__(self, 
-                soundpacklist=False, 
-                tag=None, 
-                enabled=None, 
-                sensitivity=None, 
-                type=None, 
+                _type=None, 
                 url=None, 
                 param='', 
                 *args, 
@@ -180,17 +214,8 @@ class IntamacAPI(ElementBase):
         ET.register_namespace('', 'intamac:intamacapi')
         root = ET.Element('{intamac:intamacapi}intamacapi')
         root.text = param
-        if soundpacklist == True:
-            sound_pack_list = ET.SubElement(root, 'SoundPackList')
-            sound_pack = ET.SubElement(sound_pack_list, 'SoundPack')
-            tag_tag = ET.SubElement(sound_pack, 'tag')
-            tag_tag.text = tag
-            tag_enabled = ET.SubElement(sound_pack, 'enabled')
-            tag_enabled.text = enabled
-            tag_sensitivity = ET.SubElement(sound_pack, 'sensitivity')
-            tag_sensitivity.text = sensitivity
         ElementBase.__init__(self, xml=root)
-        self['type'] = type
+        self['type'] = _type
         self['url'] = url
 
 
