@@ -73,9 +73,6 @@ import os
 
 import boto3
 
-from XMPPGateway.queueing_system.queueing import queue_push
-from XMPPGateway.db_access.sql_server_interface import get_connection, get_data
-
 import sleekxmpp
 from sleekxmpp import roster
 from sleekxmpp.componentxmpp import ComponentXMPP
@@ -88,10 +85,15 @@ from sleekxmpp.stanza.presence import Presence
 from sleekxmpp.xmlstream.handler.callback import Callback
 from sleekxmpp.xmlstream.matcher.xpath import MatchXPath
 from sleekxmpp.xmlstream.matcher import StanzaPath
+from sleekxmpp.exceptions import IqTimeout, IqError
 
+from XMPPGateway.queueing_system.sqs_q.consumer import get_queue, poll
+from XMPPGateway.queueing_system.sqs_q.producer import push
+from XMPPGateway.db_access.sql_server_interface import get_connection, get_data
 from XMPPGateway.sleek.custom_stanzas import (DeviceInfo, 
                                 IntamacStream, 
                                 IntamacFirmwareUpgrade, 
+                                IntamacSetting,
                                 IntamacAPI, 
                                 IntamacEvent, 
                                 Config
@@ -100,17 +102,11 @@ from XMPPGateway.sleek.custom_stanzas import (DeviceInfo,
 import atexit 
 
 
-# The three lines of code below serve testing purposes. They should
-# not be present in production code. 
-
 threaded = True
 
-messages = []
-
-connections = ['c42f90b752dd@use-xmpp-01/camera', 
-                'c42f90b752dd@use-xmpp-01', 
-                'user0@use-xmpp-01']
-
+queue_name = 'test'
+inbound_queue = 'xmpp-inbound'
+outbound_queue = 'xmpp-outbound'
 
 class Component(ComponentXMPP):
 
@@ -137,10 +133,24 @@ class Component(ComponentXMPP):
                                      config['server'],
                                      config['port'], use_jc_ns=False)
 
+        # Stanzas sent from the Component to the devices
+        self.stanzas = {
+                        'intamacapi': IntamacAPI,
+                        'intamacstream': IntamacStream,
+                        'intamacfirmwareupgrade': IntamacFirmwareUpgrade,
+                        'intamacsetting': IntamacSetting,
+        }
+
+        # SQS queue connection objects 
+        self.queue = get_queue(queue_name) # temporary test queue to be deleted soon 
+        self.inbound = get_queue(inbound_queue)
+        self.outbound = get_queue(outbound_queue)
+
         custom_stanzas = {
             DeviceInfo: self.intamac_device_info,
             IntamacStream: self.intamac_stream,
             IntamacFirmwareUpgrade: self.intamac_firmware_upgrade,
+            IntamacSetting: self.intamac_setting,
             IntamacAPI: self.intamac_api,
             IntamacEvent: self.intamac_event
         }
@@ -195,7 +205,7 @@ class Component(ComponentXMPP):
         #self.add_event_handler('iq', self.iq, threaded=True)
 
         if self.check_is_first():
-        	self.check_status_devices()
+            self.check_status_devices()
 
         self.registerPlugin('xep_0030') # Service Discovery
         self.registerPlugin('xep_0004') # Data Forms
@@ -216,17 +226,17 @@ class Component(ComponentXMPP):
         # arise from the fact that a presence is being sent from a JID to the same JID.
         # The solution that I can think of for the moment is to explicitly define 
         # a specific destination and a different sender JID. 
-        self.send_presence(pto=connections[1], pfrom=self.boundjid.bare, ptype='probe')
-        self.poll_queue()
+        self.send_presence(pto='', pfrom=self.boundjid.bare, ptype='probe')
+        self.poll_queue('test')
 
     def check_status_devices(self):
-    	devices = self.obtain_list_devices()
+        devices = self.obtain_list_devices()
 
     def obtain_list_devices(self):
-    	pass
+        pass
 
     def check_is_first(self):
-    	return True
+        return True
 
     def presence(self, presence):
         print(presence)
@@ -279,7 +289,7 @@ class Component(ComponentXMPP):
         if info['type'] != 'result':
         #self.make_iq_result(id=info['id'], ito=info['from'], ifrom=self.boundjid.bare + '/test').send()
             info.reply().send()
-        queue_push(info)
+        push(self.outbound, str(info))
 
     def intamac_stream(self, stream):
         print(stream)
@@ -287,14 +297,22 @@ class Component(ComponentXMPP):
         if stream['type'] != 'result':
             stream.reply().send()
         #self.make_iq_result(id=stream['id'], ito=stream['from'], ifrom=self.boundjid.bare + '/test').send()
+        push(self.outbound, str(stream))
         
-
     def intamac_firmware_upgrade(self, upgrade):
         print(upgrade)
         origin = JID(upgrade['from']).bare
         if upgrade['type'] != 'result':
         #self.make_iq_result(id=upgrade['id'], ito=upgrade['from'], ifrom=self.boundjid.bare + '/test').send()
             upgrade.reply().send()
+        push(self.outbound, str(upgrade))
+
+    def intamac_setting(self, setting):
+        print(setting)
+        origin = JID(setting['from']).bare
+        if setting['type'] != 'result':
+            setting.reply().send()
+        push(self.outbound, str(setting))
 
     def intamac_api(self, api, *args, **kwargs):
         #print(api)
@@ -302,6 +320,7 @@ class Component(ComponentXMPP):
         if api['type'] != 'result':
         #self.make_iq_result(id=api['id'], ito=api['from'], ifrom=self.boundjid.bare + '/test').send()
             api.reply().send()
+        push(self.outbound, str(api))
 
     def intamac_event(self, event):
         print(event)
@@ -309,6 +328,7 @@ class Component(ComponentXMPP):
         if event['type'] != 'result':
         #self.make_iq_result(id=event['id'], ito=event['from'], ifrom=self.boundjid.bare + '/test').send()
             event.reply().send()
+        push(self.outbound, str(event))
 
     def delay(self, delay):
         '''
@@ -317,66 +337,27 @@ class Component(ComponentXMPP):
         '''
         print(delay)
 
-    def poll_queue(self, queue=None):
-        outcomes = {}
-        sqs = boto3.resource('sqs')
-        queue = sqs.get_queue_by_name(QueueName='test')
-        print('listening to the queue...')
-        now = datetime.datetime.now()
-        end = now + datetime.timedelta(seconds=5)
-        print(end)
-        while datetime.datetime.now() < end:
-            for message in queue.receive_messages():
-                #print(message.body)
-                data = message.body.split('_')
-                if data[0] not in outcomes.keys():
-                    outcomes[data[0]] = [data]
-                else:
-                    outcomes[data[0]].append(data)
-                message.delete()
-        print('printing outcomes...')
-        for key, value in outcomes:
-            print(key)
-            print('-'*10)
-            for data in value:
-                print(data)
+    def poll_queue(self, queue_name=None, queue=None):
+        for data in poll(self.queue):
+            #print(data)
+            sub_stanza = self.build_sub_stanza(**data)
+            iq = self.make_iq_set(sub=sub_stanza, ito=data['to'], ifrom=self.boundjid)
+            #print(iq)
+            try:
+                iq.send()
+            except IqTimeout:
+                print('It is taking some time to receive back the response...')
+            except IqError:
+                print('An unexpected error handling the stanza has occurred')
+            except Exception as e:
+                print('An unexpected error has occurred! ', str(e))
 
 
+    def build_sub_stanza(self, namespace, **params):
+        #print(params)
+        sub_stanza = self.stanzas[namespace].__call__(**params)
+        return sub_stanza
 
-
-    #############################################
-    ## CODE FOR COMMUNICATION WITH THE DEVICES ##
-    #############################################
-
-    def intamac_firmware_upgrade_send(self):
-        upgrade = IntamacFirmwareUpgrade()
-        upgrade['location'] = "https://stg.upgrade.swann.intamac.com/swa_firmware_v505_151020.dav"
-        #print(upgrade)
-        iqs = [self.make_iq_set(sub=upgrade, ito=conn, ifrom=self.boundjid.bare) for conn in connections]
-        resp = [iq.send(timeout=5) for iq in iqs]
-        return resp 
-
-    def intamac_api_send(self):
-        text = '&lt;SoundPackList&gt;&lt;SoundPack&gt;&lt;tag&gt;Aggression&lt;/tag&gt;&lt;enabled&gt;false&lt;/enabled&gt;&lt;sensitivity&gt;50&lt;/sensitivity&gt;&lt;/SoundPack&gt;&lt;SoundPack&gt;&lt;tag&gt;BabyCry&lt;/tag&gt;&lt;enabled&gt;false&lt;/enabled&gt;&lt;sensitivity&gt;50&lt;/sensitivity&gt;&lt;/SoundPack&gt;&lt;SoundPack&gt;&lt;tag&gt;CarAlarm&lt;/tag&gt;&lt;enabled&gt;false&lt;/enabled&gt;&lt;sensitivity&gt;50&lt;/sensitivity&gt;&lt;/SoundPack&gt;&lt;SoundPack&gt;&lt;tag&gt;GlassBreak&lt;/tag&gt;&lt;enabled&gt;false&lt;/enabled&gt;&lt;sensitivity&gt;50&lt;/sensitivity&gt;&lt;/SoundPack&gt;&lt;SoundPack&gt;&lt;tag&gt;Gunshot&lt;/tag&gt;&lt;enabled&gt;false&lt;/enabled&gt;&lt;sensitivity&gt;50&lt;/sensitivity&gt;&lt;/SoundPack&gt;&lt;SoundPack&gt;&lt;tag&gt;SmokeAlarm&lt;/tag&gt;&lt;enabled&gt;false&lt;/enabled&gt;&lt;sensitivity&gt;50&lt;/sensitivity&gt;&lt;/SoundPack&gt;&lt;/SoundPackList&gt;'
-        text2 = '<SoundPackList><SoundPack><tag>Aggression</tag><enabled>false</enabled><sensitivity>100</sensitivity></SoundPack><SoundPack><tag>BabyCry</tag><enabled>false</enabled><sensitivity>50</sensitivity></SoundPack><SoundPack><tag>CarAlarm</tag><enabled>true</enabled><sensitivity>50</sensitivity></SoundPack><SoundPack><tag>GlassBreak</tag><enabled>true</enabled><sensitivity>50</sensitivity></SoundPack><SoundPack><tag>Gunshot</tag><enabled>false</enabled><sensitivity>50</sensitivity></SoundPack><SoundPack><tag>SmokeAlarm</tag><enabled>false</enabled><sensitivity>50</sensitivity></SoundPack></SoundPackList>'
-        api = IntamacAPI(param=text2, url="/Event/audioanalyse", type='1', soundpacklist=False)
-        #api['SoundPackList']['SoundPack']['enabled'] = 'True'
-        #print(api)
-        iqs = [self.make_iq_set(sub=api, ito=conn, ifrom=self.boundjid.bare) for conn in connections]
-        resp = [iq.send(timeout=5) for iq in iqs]
-        return resp 
-
-    def intamac_stream_send(self):
-        stream = IntamacStream('000000000000000000000000000000000000000000000000000000000000', 
-            ip='192.168.1.100', 
-            port='5000', 
-            type='start', 
-            timeout='10', 
-            quality='sub')
-        #print(stream)
-        iqs = [self.make_iq_set(sub=stream, ito=conn, ifrom=self.boundjid.bare) for conn in connections]
-        resp = [iq.send(timeout=5) for iq in iqs]
-        return resp 
 
 def make_component(config_path, cls, connect=False, block=False, *args, **kwargs):
     config_file = open(config_path, 'r+')
@@ -402,8 +383,8 @@ if __name__ == '__main__':
 
     atexit.register(exit_handler)
 
-    #logging.basicConfig(level=logging.DEBUG,
-    #                    format='%(levelname)-8s %(message)s')
+    logging.basicConfig(level=logging.DEBUG,
+                        format='%(levelname)-8s %(message)s')
 
     # Load configuration data.
     config_file = open(prod_config_file, 'r+')
