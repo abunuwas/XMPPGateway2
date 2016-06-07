@@ -36,8 +36,6 @@ import atexit
 
 import threading
 
-import curses
-
 from XMPPGateway.sleek.custom_stanzas import (DeviceInfo, 
                                               IntamacStream, 
                                               IntamacFirmwareUpgrade, 
@@ -225,34 +223,64 @@ class Client(sleekxmpp.ClientXMPP):
         resp = [iq.send(timeout=5) for iq in iqs]
         return resp 
 
-    ################# HANDLE STANZAS SENT BY THE COMPONENT #############
+
+    ########################################################################
+    ################# HANDLE STANZAS SENT BY THE COMPONENT #################
+    ########################################################################
+
 
     def _intamac_stream(self, stream):
         print(stream)
         origin = JID(stream['from']).bare
         if stream['type'] != 'result':
-            stream.reply().send(to='muc@test.use-xmpp-01/test')
+            reply_stream = IntamacStream()
+            iq = stream.reply()
+            #iq = Iq()
+            iq['to'] = 'muc@test.use-xmpp-01/test'
+            #iq['iq']=stream['id']
+            #iq['from'] = self.boundjid
+            iq.append(reply_stream)
+            iq.send()
         #self.make_iq_result(id=stream['id'], ito=stream['from'], ifrom=self.boundjid.bare + '/test').send()
         
     def _intamac_firmware_upgrade(self, upgrade):
         print(upgrade)
         origin = JID(upgrade['from']).bare
         if upgrade['type'] != 'result':
-        #self.make_iq_result(id=upgrade['id'], ito=upgrade['from'], ifrom=self.boundjid.bare + '/test').send()
-            upgrade.reply().send()
+            reply_upgrade = IntamacFirmwareUpgrade()     
+            iq = upgrade.reply()     
+            #iq = Iq()
+            iq['to'] = 'muc@test.use-xmpp-01/test'
+            #iq['iq']=upgrade['id']
+            #iq['from'] = self.boundjid
+            iq.append(reply_upgrade)
+            iq.send()
 
     def _intamac_setting(self, setting):
         print(setting)
         origin = JID(setting['from']).bare
         if setting['type'] != 'result':
-            setting.reply().send()
+            reply_setting = IntamacSetting()    
+            iq = setting.reply()       
+            #iq = Iq()
+            iq['to'] = 'muc@test.use-xmpp-01/test'
+            #iq['iq']=setting['id']
+            #iq['from'] = self.boundjid
+            iq.append(reply_setting)
+            iq.send()
 
     def _intamac_api(self, api, *args, **kwargs):
         #print(api)
         origin = JID(api['from']).bare
         if api['type'] != 'result':
-        #self.make_iq_result(id=api['id'], ito=api['from'], ifrom=self.boundjid.bare + '/test').send()
-            api.reply().send()
+            reply_api = IntamacAPI()  
+            iq = api.reply()        
+            #iq = Iq()
+            iq['to'] = 'muc@test.use-xmpp-01/test'
+            #iq['iq']=api['id']
+            #iq['from'] = self.boundjid
+            iq.append(reply_api)
+            iq.send()
 
 
 def make_bot(username, connect=False, block=False):
@@ -303,7 +331,6 @@ if __name__ == '__main__':
     atexit.register(exit_handler)
     
     logging.basicConfig(level=logging.DEBUG, format='%(levelname)-8s %(message)s')
-
     #thread1 = threading.Thread(target=make_bot, args=('user0',))
     
 
