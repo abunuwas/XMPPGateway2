@@ -140,14 +140,14 @@ stanzas = [intamacapi, intamacsetting, intamacstream, intamacfirmwareupgrade]
 def test(queue, device):
 	import random
 	e = 0
-	while e < 5:
+	while e < 10:
 		index = random.randint(0, len(stanzas)-1)
 		print(index)
 		stanza = stanzas[index]
 		print(stanza['MessageAttributes']['namespace'])
 		response = queue.send_message(**stanza)
 		print(response)
-		time.sleep(.3)
+		time.sleep(.5)
 		e += 1
 
 if __name__ == '__main__':
