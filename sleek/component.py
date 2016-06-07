@@ -101,6 +101,7 @@ from XMPPGateway.sleek.custom_stanzas import (DeviceInfo,
 
 import atexit 
 
+xmpp = None
 
 threaded = True
 
@@ -159,7 +160,7 @@ class Component(ComponentXMPP):
             register_stanza_plugin(Iq, custom_stanza)
             self.register_handler(
                 Callback(custom_stanza.plugin_attrib,
-                    StanzaPath('iq@type=set/{}'.format(custom_stanza.plugin_attrib)),
+                    StanzaPath('iq/{}'.format(custom_stanza.plugin_attrib)),
                     handler)
                 )
 
@@ -185,7 +186,6 @@ class Component(ComponentXMPP):
             Callback('iq_api',
                 StanzaPath('iq@type=set/iq_intamacapi'),
                 self.intamac_device_info))
-        
         '''
 
         # The following lines of code take care of registering 
@@ -379,12 +379,35 @@ if __name__ == '__main__':
     prod_config_file = os.path.join(config_dir, 'config.xml')
 
     def exit_handler():
-        xmpp.disconnect()
+    	if xmpp is not None:
+    		xmpp.disconnect()
 
     atexit.register(exit_handler)
 
+    #logger = logging.getLogger('sleekxmpp')
+    #logger.setLevel(logging.DEBUG)
+    #ch = logging.StreamHandler(sys.stdout)
+    #ch.setLevel(logging.DEBUG)
+    #formatter = logging.Formatter('%(levelname)-8s %(message)s')
+    #ch.setFormatter(formatter)
+    #logger.addHandler(formatter)
+    #logger.addHandler(ch)
+
+    #loggers = logging.Logger.manager.loggerDict
+    #sleek_log_names = [name for name in loggers if 'sleek' in name]
+    #sleek_loggers = [logging.getLogger(name) for name in sleek_log_names]
+    #for log in sleek_loggers:
+    #	log.setLevel(logging.DEBUG)
+    #	log.setFormatter(format='%(levelname)-8s %(message)s')
+    #for log in sleek_loggers:
+    #	log.setLevel(logging.DEBUG)
+
+    #sleek_logger = logging.getLogger('xmlstream')
+    #sleek_logger.setLevel(logging.DEBUG)
     logging.basicConfig(level=logging.DEBUG,
                         format='%(levelname)-8s %(message)s')
+    boto_logger = logging.getLogger('botocore')
+    boto_logger.setLevel(logging.ERROR)
 
     # Load configuration data.
     config_file = open(prod_config_file, 'r+')
