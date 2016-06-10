@@ -1,0 +1,26 @@
+.
+├── config
+│   ├── config_local.xml
+│   └── config.xml
+├── main.py
+├── requirements.txt
+├── setup.py
+├── sleek
+│   ├── __init__.py
+│   ├── component.py
+│   └── custom_stanzas.py
+├── db_access
+│   ├── __init__.py
+│   └── sql_server_interface.py
+├── queueing_systems
+│   ├── __init__.py
+│   ├── sqs
+│   |	├── __init__.py
+│   |	└── push.py
+│   └── kinesis
+│   	├── __init__.py
+│   	└── push.py
+├── run_tets.py  
+├── tests
+└── venv
+
