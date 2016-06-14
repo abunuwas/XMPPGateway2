@@ -39,6 +39,10 @@ XMPPGateway$ virtualenv venv python=<path_to_Python3_executable, e.g. C:\Python.
 
 XMPPGateway$ source venv/bin/activate
 
+or 
+
+XMPPGateway$ . venv/bin/activate
+
 4.2) On Windows:
 
 XMPPGateway$ venv/scripts/activate
