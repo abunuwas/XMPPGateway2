@@ -1,4 +1,5 @@
 import datetime
+import time
 
 import boto3
 from botocore.exceptions import ClientError
@@ -16,7 +17,7 @@ def get_queue(queue_name):
     except ClientError:
         print('The requested queue does not exist.')
 
-def poll(queue, p_id=None):
+def poll(queue, p_id=None, sleep=None):
     while True:
         #print('new loop')
         for message in queue.receive_messages(MessageAttributeNames=['*']):
@@ -39,10 +40,15 @@ def poll(queue, p_id=None):
             #else:
             #   outcomes[device].append(message.body)
             message.delete()
+        if sleep:
+            time.sleep(sleep)
 
 if __name__ == '__main__':
+    import logging
+    logging.basicConfig(level=logging.INFO,
+                        format='%(levelname)-8s %(message)s')
     queue = get_queue(queue_name)
-    poll(queue)
+    poll(queue, sleep=2)
     '''
     import multiprocessing as mp
     queue = get_queue(queue_name)
