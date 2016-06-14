@@ -109,6 +109,8 @@ queue_name = 'test'
 inbound_queue = 'xmpp-inbound'
 outbound_queue = 'xmpp-outbound'
 
+poll_sleep = 0
+
 class Component(ComponentXMPP):
 
     """
@@ -338,7 +340,8 @@ class Component(ComponentXMPP):
         print(delay)
 
     def poll_queue(self, queue_name=None, queue=None):
-        for data in poll(self.queue):
+        poll_sleep=10
+        for data in poll(self.queue, sleep=poll_sleep):
             #print(data)
             sub_stanza = self.build_sub_stanza(**data)
             iq = self.make_iq_set(sub=sub_stanza, ito=data['to'], ifrom=self.boundjid)
