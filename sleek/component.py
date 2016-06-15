@@ -407,10 +407,13 @@ if __name__ == '__main__':
 
     #sleek_logger = logging.getLogger('xmlstream')
     #sleek_logger.setLevel(logging.DEBUG)
-    logging.basicConfig(level=logging.DEBUG,
-                        format='%(levelname)-8s %(message)s')
-    boto_logger = logging.getLogger('botocore')
-    boto_logger.setLevel(logging.ERROR)
+    #logging.basicConfig(level=logging.DEBUG,
+    #                    format='%(levelname)-8s %(message)s')
+    #boto_logger = logging.getLogger('botocore')
+    #boto_logger.setLevel(logging.ERROR)
+    logging.getLogger('boto3').setLevel(logging.WARNING)
+    logging.getLogger('botocore').setLevel(logging.WARNING)
+    logging.getLogger('nose').setLevel(logging.WARNING)
 
     # Load configuration data.
     config_file = open(prod_config_file, 'r+')
