@@ -6,6 +6,6 @@ setup(name='XMPPGateway',
 		author_email='joseh@intamac.com, robertb@intamac.com',
 		url='',
 		license='',
-		packages=['sleek', 'sleek.queueing'],
+		packages=['sleek', 'db_acccess', 'queueing_system'],
 		py_modules=['sleek.custom_stanzas']
 		)
