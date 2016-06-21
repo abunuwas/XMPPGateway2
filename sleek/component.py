@@ -68,6 +68,7 @@ import sys
 import logging
 import time
 from optparse import OptionParser
+import configparser
 import threading 
 import os
 
@@ -101,38 +102,16 @@ from XMPPGateway.sleek.custom_stanzas import (DeviceInfo,
 
 import atexit 
 
-xmpp = None
-
-threaded = True
-
-queue_name = 'test'
-inbound_queue = 'xmpp-inbound'
-outbound_queue = 'xmpp-outbound'
-
-poll_sleep = 0
 
 class Component(ComponentXMPP):
 
-    """
-    A simple SleekXMPP component that uses an external XML
-    file to store its configuration data. To make testing
-    that the component works, it will also echo messages sent
-    to it.
-    """
-
     def __init__(self, config):
-        """
-        Create a Component.
 
-        Arguments:
-            config      -- The XML contents of the config file.
-            config_file -- The XML config file object itself.
-        """
 
         register_stanza_plugin(Config, Roster)
 
         ComponentXMPP.__init__(self, config['jid'],
-                                     config['secret'],
+                                     config['password'],
                                      config['server'],
                                      config['port'], use_jc_ns=False)
 
@@ -144,8 +123,9 @@ class Component(ComponentXMPP):
                         'intamacsetting': IntamacSetting,
         }
 
-        # SQS queue connection objects 
-        self.queue = get_queue(queue_name) # temporary test queue to be deleted soon 
+        # Queue connection objects 
+        inbbound_queue = config['inbound_queue']
+        outbound_queue = config['outbound_queue']
         self.inbound = get_queue(inbound_queue)
         self.outbound = get_queue(outbound_queue)
 
@@ -181,8 +161,8 @@ class Component(ComponentXMPP):
                 self.delay)
             )
 
-        # The following piece of code shows how a normal registration
-        # process for a single stanza plugin takes place: 
+        # The following piece of code shows how is a normal registration
+        # process for a single stanza plugin 
         '''
         self.register_handler(
             Callback('iq_api',
@@ -198,14 +178,16 @@ class Component(ComponentXMPP):
 
         self.add_event_handler("session_start", self.start, threaded=True)
         #self.add_event_handler('presence', self.presence, threaded=threaded)
-        #self.add_event_handler('iq_intamacdeviceinfo', self.intamac_device_info, threaded=True)
         self.add_event_handler('presence_subscribe', self.subscribe, threaded=threaded)
         self.add_event_handler('presence_subscribed', self.subscribed, threaded=threaded)  
-        self.add_event_handler('delay', self.delay, threaded=threaded)  
         #self.add_event_handler('presence_probe', self.probe, threaded=threaded)
+        self.add_event_handler('delay', self.delay, threaded=threaded)  
         #self.add_event_handler("message", self.message, threaded=threaded)
         #self.add_event_handler('iq', self.iq, threaded=True)
 
+        # We need a mechanism in place to allow a Component coming online
+        # to determine if it's the first connecting Component after a shutdown,
+        # or not. 
         if self.check_is_first():
             self.check_status_devices()
 
@@ -215,13 +197,12 @@ class Component(ComponentXMPP):
         self.registerPlugin('xep_0199') # XMPP Ping
         self.registerPlugin('xep_0203') # Delayed stanzas
 
-    # The usefulness of this class method is not yet clear, but might prove useful
-    # later on. 
-    @classmethod
-    def variables(cls):
-        return cls.__dict__
 
     def start(self, event):
+        '''
+        This method defines the actions taken by the Component once the connection
+        to the XMPP server has been verified. 
+        '''
         # Using the method send_presence() without arguments should just work. The problem
         # is that ejabberd then takes the presence from the component (muc.localhost) and 
         # sends it to itself (muc.localhost), resulting in an error. The error seems to 
@@ -229,107 +210,123 @@ class Component(ComponentXMPP):
         # The solution that I can think of for the moment is to explicitly define 
         # a specific destination and a different sender JID. 
         self.send_presence(pto='', pfrom=self.boundjid.bare, ptype='probe')
-        self.poll_queue('test')
+        self.poll_queue(self.inbound)
 
     def check_status_devices(self):
+        '''
+        Iterates the iterator returned by obtain_list_devices to check the 
+        connection status of every device registered in the platform. 
+        '''
         devices = self.obtain_list_devices()
 
     def obtain_list_devices(self):
+        '''
+        Queries XXX database to obtain a list of all registered devices. 
+        '''
         pass
 
     def check_is_first(self):
+        '''
+        Checks whether the current Component is the first connecting Component
+        after a shutdown, or whether there currently are other Components 
+        connected to the XMPP server. 
+
+        Returns a boolean. 
+        '''
         return True
 
     def presence(self, presence):
-        print(presence)
         '''
-        print('TYPE: ', presence['type'])
+        Handles presence stanzas. 
+        '''
+        #print(presence)
+        '''
         _from = JID(presence['from']).bare
-        print(_from)
         if self.boundjid.bare not in _from:
-            self.send_presence(pto=_from, pfrom=self.boundjid.bare + '/test')
+            self.send_presence(pto=_from, 
+                              pfrom=self.boundjid.bare + '/test', 
+                              block=False
+                              )
         '''
+        pass
 
     def subscribe(self, presence):
-        print(presence)
-        print('This should be subscribe: ', presence['type'])
+        '''
+        Responds to presence subscribe stanzas. 
+        '''
+        #print(presence)
         self.send_presence(pto=presence['from'],
                           pfrom=self.boundjid.bare + '/test',
-                          ptype='available')
+                          ptype='available',
+                          block=False
+                          )
 
     def subscribed(self, presence):
+        '''
+        Responds to prseence subscribed stanzas. 
+        '''
         print(presence)
         print('This should be subscribed: ', presence['type'])
-        self.send_presence(pto=presence['from'], pfrom=self.boundjid.bare, ptype='subscribed')        
-        
-    '''
-    def message(self, msg):
-        print(msg)
-        messages.append(msg)
-        print('MESSAGES RECEIVED: ', len(messages))
-        _from = JID(msg['from']).full
-        if self.boundjid.bare not in _from:
-            print(_from)
-            print(self.boundjid.bare)
-            msg.reply("Thanks for sending\n%(body)s" % msg).send()
-    '''
+        self.send_presence(pto=presence['from'], 
+                          pfrom=self.boundjid.bare, 
+                          ptype='subscribed',
+                          block=False
+                          )        
+
 
     def probe(self, probe):
+        '''
+        Respond to presence probe stanzas. 
+        '''
         #print('This should be probe: ', probe['type'])
         #print(probe)
         pass
 
-    def iq(content):
-        #print(content)
-        #print('ORIGIN IS: ', content['from'])
-        #self.make_iq_result(ito=content['from'], id=['id'], ifrom=self.boundjid.bare  + '/test').send()
-        content.reply().send()
-
     def intamac_device_info(self, info):
-        print(info)
+        #print(info)
         origin = JID(info['from']).bare
         if info['type'] != 'result':
-        #self.make_iq_result(id=info['id'], ito=info['from'], ifrom=self.boundjid.bare + '/test').send()
-            info.reply().send()
+        #self.make_iq_result(id=info['id'], ito=info['from'], ifrom=self.boundjid.bare + '/test').send(block=False)
+            info.reply().send(block=False)
         push(self.outbound, str(info))
 
     def intamac_stream(self, stream):
-        print(stream)
+        #print(stream)
         origin = JID(stream['from']).bare
         if stream['type'] != 'result':
-            stream.reply().send()
-        #self.make_iq_result(id=stream['id'], ito=stream['from'], ifrom=self.boundjid.bare + '/test').send()
+            stream.reply().send(block=False)
+        #self.make_iq_result(id=stream['id'], ito=stream['from'], ifrom=self.boundjid.bare + '/test').send(block=False)
         push(self.outbound, str(stream))
         
     def intamac_firmware_upgrade(self, upgrade):
-        print(upgrade)
+        #print(upgrade)
         origin = JID(upgrade['from']).bare
         if upgrade['type'] != 'result':
-        #self.make_iq_result(id=upgrade['id'], ito=upgrade['from'], ifrom=self.boundjid.bare + '/test').send()
-            upgrade.reply().send()
+        #self.make_iq_result(id=upgrade['id'], ito=upgrade['from'], ifrom=self.boundjid.bare + '/test').send(block=False)
+            upgrade.reply().send(block=False)
         push(self.outbound, str(upgrade))
 
     def intamac_setting(self, setting):
-        print(setting)
+        #print(setting)
         origin = JID(setting['from']).bare
         if setting['type'] != 'result':
-            setting.reply().send()
+            setting.reply().send(block=False)
         push(self.outbound, str(setting))
 
     def intamac_api(self, api, *args, **kwargs):
         #print(api)
         origin = JID(api['from']).bare
         if api['type'] != 'result':
-        #self.make_iq_result(id=api['id'], ito=api['from'], ifrom=self.boundjid.bare + '/test').send()
-            api.reply().send()
+        #self.make_iq_result(id=api['id'], ito=api['from'], ifrom=self.boundjid.bare + '/test').send(block=False)
+            api.reply().send(block=False)
         push(self.outbound, str(api))
 
     def intamac_event(self, event):
-        print(event)
+        #print(event)
         origin = JID(event['from']).bare
         if event['type'] != 'result':
-        #self.make_iq_result(id=event['id'], ito=event['from'], ifrom=self.boundjid.bare + '/test').send()
-            event.reply().send()
+        #self.make_iq_result(id=event['id'], ito=event['from'], ifrom=self.boundjid.bare + '/test').send(block=False)
+            event.reply().send(block=False)
         push(self.outbound, str(event))
 
     def delay(self, delay):
@@ -340,14 +337,14 @@ class Component(ComponentXMPP):
         print(delay)
 
     def poll_queue(self, queue_name=None, queue=None):
-        poll_sleep=10
+        poll_sleep=config['poll_sleep']
         for data in poll(self.queue, sleep=poll_sleep):
             #print(data)
             sub_stanza = self.build_sub_stanza(**data)
             iq = self.make_iq_set(sub=sub_stanza, ito=data['to'], ifrom=self.boundjid)
             #print(iq)
             try:
-                iq.send()
+                iq.send(timeout=None)
             except IqTimeout:
                 print('It is taking some time to receive back the response...')
             except IqError:
@@ -362,78 +359,19 @@ class Component(ComponentXMPP):
         return sub_stanza
 
 
+def load_config_data(config_file):
+    config = configparser.ConfigParser()
+    config.read(prod_config_file)
+    return config['DEFAULT']
+
 def make_component(config_path, cls, connect=False, block=False, *args, **kwargs):
-    config_file = open(config_path, 'r+')
-    config_data = "\n".join([line for line in config_file])
-    config = Config(xml=ET.fromstring(config_data))
-    config_file.close()
+    config = load_config_data('config.ini')
+    # Create Component instance with config data
     xmpp = cls(config)
+    # Connect to the XMPP server and start processing XMPP stanzas.
     if connect:
         xmpp.connect()
         xmpp.process(block=block)
     return xmpp
 
-
-
-if __name__ == '__main__':
-
-    config_dir = os.path.abspath(os.path.join(os.pardir, 'config'))
-    local_config_file = os.path.join(config_dir, 'config_local.xml')
-    prod_config_file = os.path.join(config_dir, 'config.xml')
-
-    def exit_handler():
-    	if xmpp is not None:
-    		xmpp.disconnect()
-
-    atexit.register(exit_handler)
-
-    #logger = logging.getLogger('sleekxmpp')
-    #logger.setLevel(logging.DEBUG)
-    #ch = logging.StreamHandler(sys.stdout)
-    #ch.setLevel(logging.DEBUG)
-    #formatter = logging.Formatter('%(levelname)-8s %(message)s')
-    #ch.setFormatter(formatter)
-    #logger.addHandler(formatter)
-    #logger.addHandler(ch)
-
-    #loggers = logging.Logger.manager.loggerDict
-    #sleek_log_names = [name for name in loggers if 'sleek' in name]
-    #sleek_loggers = [logging.getLogger(name) for name in sleek_log_names]
-    #for log in sleek_loggers:
-    #	log.setLevel(logging.DEBUG)
-    #	log.setFormatter(format='%(levelname)-8s %(message)s')
-    #for log in sleek_loggers:
-    #	log.setLevel(logging.DEBUG)
-
-    #sleek_logger = logging.getLogger('xmlstream')
-    #sleek_logger.setLevel(logging.DEBUG)
-    #logging.basicConfig(level=logging.DEBUG,
-    #                    format='%(levelname)-8s %(message)s')
-    #boto_logger = logging.getLogger('botocore')
-    #boto_logger.setLevel(logging.ERROR)
-    logging.getLogger('boto3').setLevel(logging.WARNING)
-    logging.getLogger('botocore').setLevel(logging.WARNING)
-    logging.getLogger('nose').setLevel(logging.WARNING)
-
-    # Load configuration data.
-    config_file = open(prod_config_file, 'r+')
-    config_data = "\n".join([line for line in config_file])
-    config = Config(xml=ET.fromstring(config_data))
-    config_file.close()
-
-    xmpp = Component(config)
-    #xmpp.registerPlugin('xep_0030') # Service Discovery
-    #xmpp.registerPlugin('xep_0004') # Data Forms
-    #xmpp.registerPlugin('xep_0060') # PubSub
-    #xmpp.registerPlugin('xep_0199') # XMPP Ping
-    #xmpp.registerPlugin('xep_0203') # Delayed stanzas
-
-    # Connect to the XMPP server and start processing XMPP stanzas.
-    if xmpp.connect():
-        xmpp.process(block=False)
-        thread2 = threading.Thread(args=(xmpp,))
-        thread2.start()
-        print("Done")
-    else:
-        print("Unable to connect.")
 
