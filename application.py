@@ -18,16 +18,36 @@ def exit_handler():
 
 atexit.register(exit_handler)
 
-logging.basicConfig(level=logging.DEBUG,
-                    format='%(levelname)-8s %(message)s')
-boto_logger = logging.getLogger('botocore')
-boto_logger.setLevel(logging.ERROR)
+#logger = logging.getLogger('sleekxmpp')
+#logger.setLevel(logging.DEBUG)
+#ch = logging.StreamHandler(sys.stdout)
+#ch.setLevel(logging.DEBUG)
+#formatter = logging.Formatter('%(levelname)-8s %(message)s')
+#ch.setFormatter(formatter)
+#logger.addHandler(formatter)
+#logger.addHandler(ch)
+
+#loggers = logging.Logger.manager.loggerDict
+#sleek_log_names = [name for name in loggers if 'sleek' in name]
+#sleek_loggers = [logging.getLogger(name) for name in sleek_log_names]
+#for log in sleek_loggers:
+#	log.setLevel(logging.DEBUG)
+#	log.setFormatter(format='%(levelname)-8s %(message)s')
+#for log in sleek_loggers:
+#	log.setLevel(logging.DEBUG)ls
+
+#sleek_logger = logging.getLogger('xmlstream')
+#sleek_logger.setLevel(logging.DEBUG)
+#logging.basicConfig(level=logging.DEBUG,
+#                    format='%(levelname)-8s %(message)s')
+#boto_logger = logging.getLogger('botocore')
+#boto_logger.setLevel(logging.ERROR)
+logging.getLogger('boto3').setLevel(logging.WARNING)
+logging.getLogger('botocore').setLevel(logging.WARNING)
+logging.getLogger('nose').setLevel(logging.WARNING)
 
 # Load configuration data.
-config_file = open(prod_config_file, 'r+')
-config_data = "\n".join([line for line in config_file])
-config = Config(xml=ET.fromstring(config_data))
-config_file.close()
+config = load_config_data(prod_config_file)
 
 xmpp = Component(config)
 
