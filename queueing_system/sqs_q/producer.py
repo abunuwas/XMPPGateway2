@@ -1,20 +1,11 @@
 import datetime
 import time
+import sys
 
 import boto3
 from botocore.exceptions import ClientError
 
-sqs = boto3.resource('sqs')
-
-queue_name = 'test-producer'
-queue_test = 'test'
-
-def get_queue(queue_name):
-	try:
-		queue = sqs.get_queue_by_name(QueueName=queue_name)
-		return queue
-	except ClientError:
-		print('The requested queue does not exist.')
+from core_sqs import get_queue
 
 def push(queue, payload, _from=None):
 	response = queue.send_message(MessageBody=payload, 

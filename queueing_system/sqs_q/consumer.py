@@ -4,23 +4,16 @@ import time
 import boto3
 from botocore.exceptions import ClientError
 
-sqs = boto3.resource('sqs')
-
-queue_name = 'test'
+from core_sqs import get_queue
 
 outcomes = {}
-
-def get_queue(queue_name):
-    try:
-        queue = sqs.get_queue_by_name(QueueName=queue_name)
-        return queue
-    except ClientError:
-        print('The requested queue does not exist.')
 
 def poll(queue, p_id=None, sleep=None):
     while True:
         #print('new loop')
+        a = None
         for message in queue.receive_messages(MessageAttributeNames=['*']):
+            a = message
             #print(message.body)
             data = {}
             param = message.body
@@ -40,6 +33,8 @@ def poll(queue, p_id=None, sleep=None):
             #else:
             #   outcomes[device].append(message.body)
             message.delete()
+        if a is None:
+            yield None
         if sleep:
             time.sleep(sleep)
 

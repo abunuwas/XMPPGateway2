@@ -88,7 +88,8 @@ from sleekxmpp.xmlstream.matcher.xpath import MatchXPath
 from sleekxmpp.xmlstream.matcher import StanzaPath
 from sleekxmpp.exceptions import IqTimeout, IqError
 
-from XMPPGateway.queueing_system.sqs_q.consumer import get_queue, poll
+from XMPPGateway.queueing_system.sqs_q.core_sqs import get_queue
+from XMPPGateway.queueing_system.sqs_q.consumer import poll
 from XMPPGateway.queueing_system.sqs_q.producer import push
 from XMPPGateway.db_access.sql_server_interface import get_connection, get_data
 from XMPPGateway.sleek.custom_stanzas import (DeviceInfo, 
@@ -124,10 +125,15 @@ class Component(ComponentXMPP):
         }
 
         # Queue connection objects 
+        aws_connection_parameters = {
+                                    'aws_access_key_id': config['aws_access_key_id'],
+                                    'aws_secret_access_key': config['aws_secret_access_key'],
+                                    'region_name': config['region_name']
+                                    }
         inbbound_queue = config['inbound_queue']
         outbound_queue = config['outbound_queue']
-        self.inbound = get_queue(inbound_queue)
-        self.outbound = get_queue(outbound_queue)
+        self.inbound = get_queue(inbound_queue, **aws_connection_parameters)
+        self.outbound = get_queue(outbound_queue, **aws_connection_parameters)
 
         custom_stanzas = {
             DeviceInfo: self.intamac_device_info,
