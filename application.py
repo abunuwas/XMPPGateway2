@@ -2,7 +2,7 @@ import os
 import atexit
 import logging
 from xml.etree import ElementTree as ET
-from XMPPGateway.sleek.component import Component
+from XMPPGateway.sleek.component import Component, load_config_data
 from XMPPGateway.sleek.custom_stanzas import Config
 
 cd = os.getcwd()
