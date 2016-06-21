@@ -361,7 +361,7 @@ class Component(ComponentXMPP):
 
 def load_config_data(config_file):
     config = configparser.ConfigParser()
-    config.read(prod_config_file)
+    config.read(config_file)
     return config['DEFAULT']
 
 def make_component(config_path, cls, connect=False, block=False, *args, **kwargs):

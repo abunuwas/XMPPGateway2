@@ -7,8 +7,8 @@ from XMPPGateway.sleek.custom_stanzas import Config
 
 cd = os.getcwd()
 config_dir = os.path.abspath(os.path.join(cd, 'config'))
-local_config_file = os.path.join(config_dir, 'config_local.xml')
-prod_config_file = os.path.join(config_dir, 'config.xml')
+#local_config_file = os.path.join(config_dir, 'config_local.xml')
+config_file = os.path.join(config_dir, 'config.ini')
 
 xmpp = None
 
@@ -47,7 +47,7 @@ logging.getLogger('botocore').setLevel(logging.WARNING)
 logging.getLogger('nose').setLevel(logging.WARNING)
 
 # Load configuration data.
-config = load_config_data(prod_config_file)
+config = load_config_data(config_file)
 
 xmpp = Component(config)
 
