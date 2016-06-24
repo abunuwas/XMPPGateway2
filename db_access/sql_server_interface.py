@@ -10,23 +10,12 @@ user = 'sqluser'
 password = '19871n5trumentat10Nabba'
 database = 'swa_intamac'
 
-procedures = {
-	'Camera_Command': 'usp_IntaDMSOutgoingCommandTableSelect'
-}
+poll_procedure = 'usp_ReceiveCameraCommandNotification'
 
 specific_commands_procedure = {
-	'Panel': "usp_IntaDMSOutgoingCommandTableSelect {command_id}",
-	'Camera': "usp_IntaClimaxG2ControlTableSelect '{mac}' {command_id}" 
+	'Panel': "exec usp_IntaDMSOutgoingCommandTableSelect {command_id}",
+	'Camera': "exec usp_IntaClimaxG2ControlTableSelect '{mac}' {command_id}" 
 }
-
-def build_camera_procedure(parameters):
-	'''
-	CHECK THAT THIS WORKS!!
-	'''
-	device = parameters['device']
-	bare_procedure = specific_commands_procedure[device]
-	full_procedure = bare_procedure.format(**parameters)
-	return full_procedure
 
 def get_token(outcomes):
 	try:
@@ -42,10 +31,11 @@ def get_procedure(token):
 	except IndexError:
 		print('Token not defined')
 
-def build_procedure(outcomes):
-	token = get_token(outcomes)
-	bare_procedure = get_procedure(token)
-	full_procedure = "exec {}, '{}' {}".format(bare_procedure, )
+def build_procedure(parameters):
+	device = parameters['device']
+	bare_procedure = specific_commands_procedure[device]
+	full_procedure = bare_procedure.format(**parameters)
+	return full_procedure
 
 def get_connection(server=None, user=None, password=None, database=None):
 	conn = _mssql.connect(server=server, 
@@ -91,9 +81,29 @@ def process_xml(data):
 	parameters = get_parameters(xml)
 	return parameters
 
-def get_notifications(conn):
-	pass 
+def get_notifications(conn, procedure):
+	try:	
+		while True:
+			result = None
+			conn.execute_query(procedure)
+			for row in conn:
+				print(row)
+				result = row[0]
+				yield result
+	except _mssql.MSSQLDatabaseException:
+		yield None
 
+def poll(connection_parameters, poll_procedure):
+	conn = get_connection(**connection_parameters)
+	conn.query_timeout = 300
+	for notification in get_notifications(conn, poll_procedure):
+		if notification is not None:
+			print(notification)
+			parameters = process_xml(notification)
+			full_procedure = build_procedure(parameters)
+			yield full_procedure
+
+'''
 def poll(connection_parameters, stored_procedure=None):
 	conn = get_connection(**connection_parameters)
 	try:
@@ -119,7 +129,7 @@ def get_data(conn, stored_procedure=None, parameter=''):
 		return command
 	else: print('**************************************Nothing to send')
 	#conn.close()
-
+'''
 if __name__ == '__main__':
 	#conn = get_connection(server=server, user=user, password=password, database=database)
 	#conn.close()
@@ -152,8 +162,10 @@ if __name__ == '__main__':
 					'command_id': 'CommandID',
 					'device': 'Camera',
 					'command': 'Command'
-	}
+				}
 	#procedure = specific_commands_procedure['Camera']
-	full_procedure = build_camera_procedure(parameters)
+	full_procedure = build_procedure(parameters)
 	print(full_procedure)
+	for command in poll(connection_parameters, poll_procedure):
+		print(command)
 
