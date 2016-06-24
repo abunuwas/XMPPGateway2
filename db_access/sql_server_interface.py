@@ -131,10 +131,6 @@ def get_data(conn, stored_procedure=None, parameter=''):
 	#conn.close()
 '''
 if __name__ == '__main__':
-	#conn = get_connection(server=server, user=user, password=password, database=database)
-	#conn.close()
-	#print(conn)
-	#conn = get_connection(server=server, user=user, password=password, database=database)
 	connection_parameters = {
 							'server': server,
 							'user': user,
