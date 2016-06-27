@@ -13,8 +13,8 @@ database = 'swa_intamac'
 poll_procedure = 'usp_ReceiveCameraCommandNotification'
 
 specific_commands_procedure = {
-	'Panel': "exec usp_IntaDMSOutgoingCommandTableSelect {command_id}",
-	'Camera': "exec usp_IntaClimaxG2ControlTableSelect '{mac}' {command_id}" 
+	'Panel': "exec usp_IntaClimaxG2ControlTableSelect {command_id}",
+	'Camera': "exec usp_IntaDMSOutgoingCommandTableSelect '{mac}', {command_id}" 
 }
 
 def get_token(outcomes):
@@ -87,7 +87,6 @@ def get_notifications(conn, procedure):
 			result = None
 			conn.execute_query(procedure)
 			for row in conn:
-				print(row)
 				result = row[0]
 				yield result
 	except _mssql.MSSQLDatabaseException:
@@ -98,38 +97,18 @@ def poll(connection_parameters, poll_procedure):
 	conn.query_timeout = 300
 	for notification in get_notifications(conn, poll_procedure):
 		if notification is not None:
-			print(notification)
 			parameters = process_xml(notification)
+			print(parameters)
 			full_procedure = build_procedure(parameters)
-			yield full_procedure
+			print(full_procedure)
+			res = conn.execute_row(full_procedure)
+			if res is not None:
+				command = res['IntaCommand']
+				yield command
+		else:
+			yield None
 
-'''
-def poll(connection_parameters, stored_procedure=None):
-	conn = get_connection(**connection_parameters)
-	try:
-		conn.query_timeout = 1
-		while True:
-			outcome = None
-			conn.execute_query(stored_procedure)
-			for row in conn:
-				outcome = process_xml(data=row[0])
-				yield get_data(conn, outcome)
-	except _mssql.MSSQLDatabaseException:
-		yield None
-		conn.close
-		poll(connection_parameters, stored_procedure)
 
-def get_data(conn, stored_procedure=None, parameter=''):
-	#conn = _mssql.connect(**connection_parameters)
-	procedure = build_procedure(outcomes)
-	res = conn.execute_row(stored_procedure)
-	if res is not None:
-		command = res['IntaCommand']
-		#conn.close()
-		return command
-	else: print('**************************************Nothing to send')
-	#conn.close()
-'''
 if __name__ == '__main__':
 	connection_parameters = {
 							'server': server,
@@ -137,22 +116,6 @@ if __name__ == '__main__':
 							'password': password,
 							'database': database
 							}
-	'''
-	e=0
-	while e<50:
-		print(e)
-		outcome = get_data2(connection_parameters, 'usp_ReceiveCameraCommandNotification')
-		#print(outcome)
-		if outcome is not None and outcome['command'] == 'Command' and outcome['device'] == 'Camera':
-			result = get_data3(connection_parameters, 
-				"exec usp_IntaDMSOutgoingCommandTableSelect '{}', {}".format(outcome['mac'], outcome['command_id'])) 
-			print(result)
-			time.sleep(2)
-		else: 
-			print('-----------------------------------------Nothing to return ')
-			print(datetime.datetime.now())
-		e+=1
-	'''
 	parameters = {
 					'mac': 'MacAddress',
 					'command_id': 'CommandID',
@@ -160,8 +123,8 @@ if __name__ == '__main__':
 					'command': 'Command'
 				}
 	#procedure = specific_commands_procedure['Camera']
-	full_procedure = build_procedure(parameters)
-	print(full_procedure)
+	#full_procedure = build_procedure(parameters)
+	#print(full_procedure)
 	for command in poll(connection_parameters, poll_procedure):
 		print(command)
 
