@@ -5,6 +5,7 @@ from xml.etree import ElementTree as ET
 import datetime
 import time
 
+### These parameters must come from config file
 server = '192.168.30.20'
 user = 'sqluser'
 password = '19871n5trumentat10Nabba'
