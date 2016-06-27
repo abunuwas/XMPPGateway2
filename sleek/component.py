@@ -321,11 +321,11 @@ class Component(ComponentXMPP):
 
     def intamac_api(self, api, *args, **kwargs):
         #print(api)
+        push(self.outbound, str(api))
         origin = JID(api['from']).bare
         if api['type'] != 'result':
         #self.make_iq_result(id=api['id'], ito=api['from'], ifrom=self.boundjid.bare + '/test').send(block=False)
             api.reply().send(block=False)
-        push(self.outbound, str(api))
 
     def intamac_event(self, event):
         #print(event)
