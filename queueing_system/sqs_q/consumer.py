@@ -4,7 +4,7 @@ import time
 import boto3
 from botocore.exceptions import ClientError
 
-from core_sqs import get_queue
+from queueing_system.sqs_q.core_sqs import get_queue
 
 outcomes = {}
 
@@ -34,7 +34,7 @@ def poll(queue, p_id=None, sleep=None):
             #   outcomes[device].append(message.body)
             message.delete()
         if a is None:
-            yield None
+            pass
         if sleep:
             time.sleep(sleep)
 

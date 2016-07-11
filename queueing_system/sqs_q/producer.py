@@ -5,7 +5,7 @@ import sys
 import boto3
 from botocore.exceptions import ClientError
 
-from core_sqs import get_queue
+from queueing_system.sqs_q.core_sqs import get_queue
 
 def push(queue, payload, _from=None):
 	response = queue.send_message(MessageBody=payload, 
