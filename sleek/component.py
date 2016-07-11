@@ -103,6 +103,7 @@ from XMPPGateway.sleek.custom_stanzas import (DeviceInfo,
 
 import atexit 
 
+threaded = True
 
 class Component(ComponentXMPP):
 
@@ -130,7 +131,8 @@ class Component(ComponentXMPP):
                                     'aws_secret_access_key': config['aws_secret_access_key'],
                                     'region_name': config['region_name']
                                     }
-        inbbound_queue = config['inbound_queue']
+        print('REGION NAMe: ', aws_connection_parameters['region_name'])
+        inbound_queue = config['inbound_queue']
         outbound_queue = config['outbound_queue']
         self.inbound = get_queue(inbound_queue, **aws_connection_parameters)
         self.outbound = get_queue(outbound_queue, **aws_connection_parameters)
@@ -343,14 +345,17 @@ class Component(ComponentXMPP):
         print(delay)
 
     def poll_queue(self, queue_name=None, queue=None):
-        poll_sleep=config['poll_sleep']
-        for data in poll(self.queue, sleep=poll_sleep):
+        #poll_sleep=config['poll_sleep']
+        poll_sleep=0
+        for data in poll(self.inbound, sleep=poll_sleep):
             #print(data)
             sub_stanza = self.build_sub_stanza(**data)
             iq = self.make_iq_set(sub=sub_stanza, ito=data['to'], ifrom=self.boundjid)
             #print(iq)
             try:
                 iq.send(timeout=None)
+            except TypeError:
+                pass
             except IqTimeout:
                 print('It is taking some time to receive back the response...')
             except IqError:
