@@ -83,6 +83,7 @@ class Client(sleekxmpp.ClientXMPP):
 
     def start(self, event):
         self.send_presence()
+        self.send_presence(pto='bc51fe82b4be@use-xmpp-01/camera')
         #self.send_presence(pfrom=self.boundjid.bare, pto='muc@test.use-xmpp-01', ptype='subscribe')
         #self.send_presence(pfrom=self.boundjid.bare, pto='muc@muc.localhost', ptype='subscribe')
         roster = self.get_roster()
@@ -334,12 +335,12 @@ if __name__ == '__main__':
     #thread1 = threading.Thread(target=make_bot, args=('user0',))
     
 
-    xmpp = Client('user1' + '@use-xmpp-01/test', 'mypassword')
+    xmpp = Client('user1' + '@use-xmpp-01', 'secret')
     xmpp.registerPlugin('xep_0030') # Service Discovery
     xmpp.registerPlugin('xep_0004') # Data Forms
     xmpp.registerPlugin('xep_0060') # PubSub
     xmpp.registerPlugin('xep_0199') # XMPP Ping
-    if xmpp.connect(('52.71.184.144', 5222), use_tls=True, use_ssl=False):
+    if xmpp.connect(('52.208.25.21', 5222), use_tls=True, use_ssl=False):
         print('connecting...')
         xmpp.process(block=False)
         thread2 = threading.Thread(target=presses, args=(xmpp,))
