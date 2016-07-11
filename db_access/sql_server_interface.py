@@ -18,6 +18,9 @@ specific_commands_procedure = {
 	'Camera': "exec usp_IntaDMSOutgoingCommandTableSelect '{mac}', {command_id}" 
 }
 
+def get_data():
+    pass
+
 def get_token(outcomes):
 	try:
 		token = outcomes['command'] + '_' + outcomes['device']
