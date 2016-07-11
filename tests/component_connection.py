@@ -94,6 +94,28 @@ def presses(xmpp):
 
 if __name__ == '__main__':
 
+
+    def load_config_data(config_file):
+        import configparser
+        config = configparser.ConfigParser()
+        config.read(config_file)
+        return config['DEFAULT']
+
+    def make_component(config_path, cls, connect=False, block=False, *args, **kwargs):
+        config_file = os.path.join(config_path, 'config.ini')
+        print(config_file)
+        config = load_config_data(config_file)
+        # Create Component instance with config data
+        xmpp = cls(config)
+        # Connect to the XMPP server and start processing XMPP stanzas.
+        if connect:
+            xmpp.connect()
+            xmpp.process(block=block)
+        return xmpp
+
+
+    xmpp = None
+
     def exit_handler():
         xmpp.disconnect()
 
@@ -108,19 +130,12 @@ if __name__ == '__main__':
     config = Config(xml=ET.fromstring(config_data))
     config_file.close()
 
-    xmpp = Component(config)   
-    xmpp.registerPlugin('xep_0030') # Service Discovery
-    xmpp.registerPlugin('xep_0004') # Data Forms
-    xmpp.registerPlugin('xep_0060') # PubSub
-    xmpp.registerPlugin('xep_0199') # XMPP Ping
-    xmpp.registerPlugin('xep_0203') # Delayed stanzas
+    xmpp = make_component('/home/osboxes/Documents/projects/IoT/XMPPGateway/config/', Component) 
 
-    # Connect to the XMPP server and start processing XMPP stanzas.
     if xmpp.connect():
         xmpp.process(block=False)
-        thread2 = threading.Thread(target=presses, args=(xmpp,))
+        thread2 = threading.Thread(args=(xmpp,))
         thread2.start()
         print("Done")
     else:
         print("Unable to connect.")
-
