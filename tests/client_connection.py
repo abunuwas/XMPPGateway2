@@ -284,10 +284,10 @@ class Client(sleekxmpp.ClientXMPP):
             iq.send()
 
 
-def make_bot(username, connect=False, block=False):
-    xmpp = Client(username + '@use-xmpp-01/test', 'mypassword')
+def make_bot(username, host, config, password, connect=False, block=False):
+    xmpp = Client(username + host, password)
     if connect:
-        xmpp.connect(('52.71.184.144', 5222), use_tls=True, use_ssl=False)
+        xmpp.connect((config['ip'], config['port']), use_tls=True, use_ssl=False)
         xmpp.process(block=block)
     return xmpp
 
@@ -326,6 +326,8 @@ def presses(xmpp):
 
 
 if __name__ == '__main__':
+	xmpp = None
+
     def exit_handler():
         xmpp.disconnect()
 
@@ -333,13 +335,15 @@ if __name__ == '__main__':
     
     logging.basicConfig(level=logging.DEBUG, format='%(levelname)-8s %(message)s')
     #thread1 = threading.Thread(target=make_bot, args=('user0',))
-    
 
-    xmpp = Client('user1' + '@use-xmpp-01', 'secret')
-    xmpp.registerPlugin('xep_0030') # Service Discovery
-    xmpp.registerPlugin('xep_0004') # Data Forms
-    xmpp.registerPlugin('xep_0060') # PubSub
-    xmpp.registerPlugin('xep_0199') # XMPP Ping
+    def load_config_data(config_file):
+        import configparser
+        config = configparser.ConfigParser()
+        config.read(config_file)
+        return config['DEFAULT']
+
+    xmpp = make_bot('user1', 'localhost', 'mypassword')
+
     if xmpp.connect(('52.208.25.21', 5222), use_tls=True, use_ssl=False):
         print('connecting...')
         xmpp.process(block=False)

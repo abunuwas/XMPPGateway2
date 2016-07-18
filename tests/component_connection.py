@@ -59,8 +59,7 @@ connections = ['c42f90b752dd@use-xmpp-01/camera',
                 'user0@use-xmpp-01']  
 
 config_dir = os.path.abspath(os.path.join(os.pardir, 'config'))
-local_config_file = os.path.join(config_dir, 'config_local.xml')
-prod_config_file = os.path.join(config_dir, 'config.xml')
+local_config_file = os.path.join(config_dir, 'config_component_local.ini')
 
 def presses(xmpp):
     while True:
@@ -102,7 +101,7 @@ if __name__ == '__main__':
         return config['DEFAULT']
 
     def make_component(config_path, cls, connect=False, block=False, *args, **kwargs):
-        config_file = os.path.join(config_path, 'config.ini')
+        config_file = os.path.join(config_path, 'config_component_local.ini')
         print(config_file)
         config = load_config_data(config_file)
         # Create Component instance with config data
@@ -124,11 +123,9 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG,
                         format='%(levelname)-8s %(message)s')
 
-    # Load configuration data.
-    config_file = open(prod_config_file, 'r+')
-    config_data = "\n".join([line for line in config_file])
-    config = Config(xml=ET.fromstring(config_data))
-    config_file.close()
+    logging.getLogger('boto3').setLevel(logging.WARNING)
+    logging.getLogger('botocore').setLevel(logging.WARNING)
+    logging.getLogger('nose').setLevel(logging.WARNING)
 
     xmpp = make_component('/home/osboxes/Documents/projects/IoT/XMPPGateway/config/', Component) 
 
