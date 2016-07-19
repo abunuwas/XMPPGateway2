@@ -1,3 +1,4 @@
+*.pyc
 build/
 deployment_requirements.md
 venv-old/
