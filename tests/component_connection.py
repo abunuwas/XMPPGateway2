@@ -61,6 +61,27 @@ connections = ['c42f90b752dd@use-xmpp-01/camera',
 config_dir = os.path.abspath(os.path.join(os.pardir, 'config'))
 local_config_file = os.path.join(config_dir, 'config_component_local.ini')
 
+
+def load_config_data(config_file):
+    import configparser
+    config = configparser.ConfigParser()
+    config.read(config_file)
+    return config['DEFAULT']
+
+def make_component(config_path, cls, connect=True, block=False, *args, **kwargs):
+    config_file = os.path.join(config_path, 'config_component_local.ini')
+    print(config_file)
+    config = load_config_data(config_file)
+    print('keys: ', config.keys())
+    # Create Component instance with config data
+    xmpp = cls(config)
+    # Connect to the XMPP server and start processing XMPP stanzas.
+    if xmpp.connect():
+        xmpp.process(block=block)
+    else:
+        print("Unable to connect.")
+    return xmpp
+
 def presses(xmpp):
     while True:
         key = input('Enter command: ')
@@ -92,27 +113,6 @@ def presses(xmpp):
             xmpp.device_info()
 
 if __name__ == '__main__':
-
-
-    def load_config_data(config_file):
-        import configparser
-        config = configparser.ConfigParser()
-        config.read(config_file)
-        return config['DEFAULT']
-
-    def make_component(config_path, cls, connect=False, block=False, *args, **kwargs):
-        config_file = os.path.join(config_path, 'config_component_local.ini')
-        print(config_file)
-        config = load_config_data(config_file)
-        # Create Component instance with config data
-        xmpp = cls(config)
-        # Connect to the XMPP server and start processing XMPP stanzas.
-        if connect:
-            xmpp.connect()
-            xmpp.process(block=block)
-        return xmpp
-
-
     xmpp = None
 
     def exit_handler():
@@ -127,12 +127,6 @@ if __name__ == '__main__':
     logging.getLogger('botocore').setLevel(logging.WARNING)
     logging.getLogger('nose').setLevel(logging.WARNING)
 
-    xmpp = make_component('/home/osboxes/Documents/projects/IoT/XMPPGateway/config/', Component) 
+    xmpp = make_component(config_dir, Component) 
 
-    if xmpp.connect():
-        xmpp.process(block=False)
-        thread2 = threading.Thread(args=(xmpp,))
-        thread2.start()
-        print("Done")
-    else:
-        print("Unable to connect.")
+        

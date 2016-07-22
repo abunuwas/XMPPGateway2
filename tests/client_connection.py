@@ -15,12 +15,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import sys
 import logging
 import getpass
 from optparse import OptionParser
 import ssl
 import time
+import json
+
+import requests
 
 import sleekxmpp
 from sleekxmpp.stanza.iq import Iq
@@ -48,6 +52,8 @@ strings = '&lt;xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;&gt;&lt;Dev
 
 #connections = ['muc@test2.xmpp.intamac.com/test']
 connections = ['muc@test.use-xmpp-01/test']
+#buddy = 'muc@test.use-xmpp-01/test'
+buddy = 'component@muc.localhost'
 
 class Client(sleekxmpp.ClientXMPP):
 
@@ -83,7 +89,8 @@ class Client(sleekxmpp.ClientXMPP):
 
     def start(self, event):
         self.send_presence()
-        self.send_presence(pto='bc51fe82b4be@use-xmpp-01/camera')
+        self.send_presence(pto=buddy)
+        self.send_presence_subscription(pto=buddy)
         #self.send_presence(pfrom=self.boundjid.bare, pto='muc@test.use-xmpp-01', ptype='subscribe')
         #self.send_presence(pfrom=self.boundjid.bare, pto='muc@muc.localhost', ptype='subscribe')
         roster = self.get_roster()
@@ -105,7 +112,7 @@ class Client(sleekxmpp.ClientXMPP):
     def subscribed(self, presence):
         print(presence)
         print(presence['type'])
-        self.send_presence_subscribed(pto=presence['from'], pfrom=self.boundjid.bare)
+        self.send_presence(pto=presence['from'], pfrom=self.boundjid.bare, ptype='subscribed')
 
     def presence(self, presence):
         print(presence)
@@ -237,7 +244,7 @@ class Client(sleekxmpp.ClientXMPP):
             reply_stream = IntamacStream()
             iq = stream.reply()
             #iq = Iq()
-            iq['to'] = 'muc@test.use-xmpp-01/test'
+            iq['to'] = buddy
             #iq['iq']=stream['id']
             #iq['from'] = self.boundjid
             iq.append(reply_stream)
@@ -251,7 +258,7 @@ class Client(sleekxmpp.ClientXMPP):
             reply_upgrade = IntamacFirmwareUpgrade()     
             iq = upgrade.reply()     
             #iq = Iq()
-            iq['to'] = 'muc@test.use-xmpp-01/test'
+            iq['to'] = buddy
             #iq['iq']=upgrade['id']
             #iq['from'] = self.boundjid
             iq.append(reply_upgrade)
@@ -264,7 +271,7 @@ class Client(sleekxmpp.ClientXMPP):
             reply_setting = IntamacSetting()    
             iq = setting.reply()       
             #iq = Iq()
-            iq['to'] = 'muc@test.use-xmpp-01/test'
+            iq['to'] = buddy
             #iq['iq']=setting['id']
             #iq['from'] = self.boundjid
             iq.append(reply_setting)
@@ -277,18 +284,40 @@ class Client(sleekxmpp.ClientXMPP):
             reply_api = IntamacAPI()  
             iq = api.reply()        
             #iq = Iq()
-            iq['to'] = 'muc@test.use-xmpp-01/test'
+            iq['to'] = buddy
             #iq['iq']=api['id']
             #iq['from'] = self.boundjid
             iq.append(reply_api)
             iq.send()
 
+def register_user(username, password):
+    headers = {"content-type": "application/json", 
+                "Host": "localhost"}
+    args = [username, "localhost", password]
+    payload = {"key": "secret", 
+                "command": "register",
+                "args": args
+                }
+    r = requests.post('http://127.0.0.1:8088/api/admin', headers=headers, data=json.dumps(payload))
+    return r
 
-def make_bot(username, host, config, password, connect=False, block=False):
-    xmpp = Client(username + host, password)
-    if connect:
-        xmpp.connect((config['ip'], config['port']), use_tls=True, use_ssl=False)
+def load_config_data(config_dir, config_file):
+    file = os.path.join(config_dir, config_file)
+    import configparser
+    config = configparser.ConfigParser()
+    config.read(file)
+    return config['DEFAULT']
+
+def make_bot(username, host, password, config_dir, connect=True, block=False):
+    config = load_config_data(config_dir, 'config_client_local.ini')
+    user = '{}@{}'.format(username, host)
+    xmpp = Client(user, password)
+    r = register_user(username, password)
+    print(r.status_code, r.content)
+    if xmpp.connect((config['server'], config['port']), use_tls=True, use_ssl=False):
         xmpp.process(block=block)
+    else:
+        print('AHHHHHHHHHHHHH ')
     return xmpp
 
 
@@ -326,7 +355,7 @@ def presses(xmpp):
 
 
 if __name__ == '__main__':
-	xmpp = None
+    xmpp = None
 
     def exit_handler():
         xmpp.disconnect()
@@ -334,37 +363,10 @@ if __name__ == '__main__':
     atexit.register(exit_handler)
     
     logging.basicConfig(level=logging.DEBUG, format='%(levelname)-8s %(message)s')
-    #thread1 = threading.Thread(target=make_bot, args=('user0',))
 
-    def load_config_data(config_file):
-        import configparser
-        config = configparser.ConfigParser()
-        config.read(config_file)
-        return config['DEFAULT']
+    config_dir = os.path.abspath(os.path.join(os.pardir, 'config'))
 
-    xmpp = make_bot('user1', 'localhost', 'mypassword')
+    num = sys.argv[1]
 
-    if xmpp.connect(('52.208.25.21', 5222), use_tls=True, use_ssl=False):
-        print('connecting...')
-        xmpp.process(block=False)
-        thread2 = threading.Thread(target=presses, args=(xmpp,))
-        thread2.start()
-        print('Done')
-    else:
-        print('Unable to connect')
+    xmpp = make_bot(username='user'+str(num), host='localhost', password='mypassword', config_dir=config_dir)
 
-    #thread1.start()
-    #thread2.start()
-
-    '''
-    import multiprocessing as mp
-    from multiprocessing import Process, Pipe, Array, Manager, Pool
-
-    jobs = []
-    for i in range(2):
-        process = mp.Process(target=make_bot, args=('user' + str(i),))
-        jobs.append(process)
-
-    for job in jobs:
-        job.start()
-    '''
