@@ -256,7 +256,10 @@ class Component(ComponentXMPP):
                               block=False
                               )
         '''
-        pass
+        self.send_presence(pto=presence['from'],
+                  pfrom=self.boundjid.bare + '/test',
+                  ptype='available',
+                  )
 
     def subscribe(self, presence):
         '''
@@ -265,20 +268,16 @@ class Component(ComponentXMPP):
         #print(presence)
         self.send_presence(pto=presence['from'],
                           pfrom=self.boundjid.bare + '/test',
-                          ptype='available',
-                          block=False
+                          ptype='subscribe',
                           )
 
     def subscribed(self, presence):
         '''
         Responds to prseence subscribed stanzas. 
         '''
-        print(presence)
-        print('This should be subscribed: ', presence['type'])
         self.send_presence(pto=presence['from'], 
                           pfrom=self.boundjid.bare, 
                           ptype='subscribed',
-                          block=False
                           )        
 
 
